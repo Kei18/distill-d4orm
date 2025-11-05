@@ -1,0 +1,41 @@
+[project]
+name = "d4orm"
+version = "0.1.0"
+description = "D4orm"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "dacite>=1.9.2",
+    "flax>=0.10.7",
+    "imageio>=2.37.2",
+    "jax>=0.6.2",
+    "loguru>=0.7.3",
+    "matplotlib>=3.10.7",
+    "pandas>=2.3.3",
+    "tqdm>=4.67.1",
+    "tyro>=0.9.35",
+]
+
+
+[dependency-groups]
+dev = [
+    "black>=25.1.0",
+    "isort>=6.0.1",
+    "jupyter-archive>=3.4.0",
+    "jupyterlab-code-formatter>=3.0.2",
+    "jupyterlab-lsp>=5.1.1",
+    "python-lsp-server>=1.12.2",
+    "ruff>=0.11.12",
+]
+
+[project.optional-dependencies]
+cuda12 = [
+  "jax[cuda12]>=0.6.2",
+]
+
+metal = [
+  "jax-metal>=0.1.0",
+]
+
+[tool.uv]
+package = true
