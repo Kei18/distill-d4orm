@@ -18,7 +18,7 @@ To install the required packages, run the following command:
 uv sync
 ```
 
-### For CUDA environment
+### For CUDA environments
 
 ```bash
 uv sync --extra cuda12
@@ -30,20 +30,21 @@ uv sync --extra cuda12
 uv run src/d4orm/d4orm.py
 ```
 
-The result will be stored in `outputs/20XX` directory.
+The results will be stored in the outputs/20XX directory.
 
-To get help:
+To see available options:
 
 ```bash
 uv run src/d4orm/d4orm.py --help
 ```
 
-For example,
+Example:
 
 ```sh
 CUDA_VISIBLE_DEVICES=3 uv run src/d4orm/d4orm.py --Nagent 10 --anytime --Niteration 30 --save-images
 ```
 
+![](./assets/trajectories.gif)
 
 
 

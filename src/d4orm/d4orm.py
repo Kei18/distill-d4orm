@@ -66,17 +66,6 @@ class D4ormCfg:
         self.sigmas = sigmas
 
 
-@dataclass
-class Args(D4ormCfg):
-    # env
-    env_name: str = "multi2dholo"
-    Nagent: int = 8  # number of agents
-    # result
-    save_images: bool = False
-    save_data: bool = True
-    logger: str = "DEBUG"
-
-
 def d4orm(
     cfg: D4ormCfg,
     env: MultiBase,
@@ -168,6 +157,17 @@ def d4orm(
     )
 
 
+@dataclass
+class Args(D4ormCfg):
+    # env
+    env_name: str = "multi2dholo"
+    Nagent: int = 8  # number of agents
+    # result
+    save_images: bool = False
+    save_data: bool = True
+    logger: str = "DEBUG"
+
+
 def main(args: Args):
     configure_logger(args.logger)
     rng = jax.random.PRNGKey(seed=args.seed)
@@ -180,7 +180,7 @@ def main(args: Args):
     # set d4orm parameters
     cfg = from_dict(D4ormCfg, asdict(args), config=Config(strict=False))
 
-    ## run diffusion
+    ## run d4orm
     start_time = time.time()
     U_base, aux = d4orm(cfg=cfg, env=env, state_init=state_init)
     elapsed_time = time.time() - start_time

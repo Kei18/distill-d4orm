@@ -33,9 +33,5 @@ cuda12 = [
   "jax[cuda12]>=0.6.2",
 ]
 
-metal = [
-  "jax-metal>=0.1.0",
-]
-
 [tool.uv]
 package = true
