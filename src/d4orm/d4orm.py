@@ -235,7 +235,7 @@ def main(args: Args):
 
         if args.save_images:
             env.render_gif(
-                states,
+                states[:max_steps_to_goal],
                 output_dir / "trajectories.gif",
                 output_dir / "trajectories.png",
             )
