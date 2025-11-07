@@ -13,7 +13,6 @@ class Multi2dHolo(MultiBase):
     action_dim_agent: int = 2
 
     diameter: float = 5.0
-    safe_margin: float = 0.05
     agent_radius: float = 0.25
 
     mv: float = 5.0  # max velocity
