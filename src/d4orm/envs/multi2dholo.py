@@ -1,33 +1,26 @@
 import jax
 from jax import numpy as jnp
 from functools import partial
+from dataclasses import dataclass
 
 from .multibase import MultiBase
 
 
+@dataclass(eq=False)
 class Multi2dHolo(MultiBase):
-    def __init__(self, num_agents):
-        super().__init__(num_agents)
-        self.num_agents = num_agents
-        self.action_dim_agent = 2
-        self.obsv_dim_agent = 4
-        self.pos_dim_agent = 2
-        self.diameter = 5
-        self.safe_margin = 0.05
-        self.agent_radius = 0.25
-        self.stop_distance = (
-            self.agent_radius / 2
-        )  # max distance to goal for termination
-        self.stop_velocity = 0.1  # max velocity for termination when reach the goal
-        self.mv = 5.0  # max velocity
-        self.ma = 2.0  # max acceleration
+    obsv_dim_agent: int = 4
+    pos_dim_agent: int = 2
+    action_dim_agent: int = 2
 
-        initial_states, goal_states = self.generate_positions(self.diameter, num_agents)
-        self.lim = self.diameter / 2 + 1
+    diameter: float = 5
+    safe_margin: float = 0.05
+    agent_radius: float = 0.25
+    stop_velocity: float = 0.1  # max velocity for termination when reach the goal
+    mv: float = 5.0  # max velocity
+    ma: float = 2.0  # max acceleration
 
-        self.x0 = initial_states.flatten()
-        self.xg = goal_states.flatten()
-        self.max_distance = self.diameter
+    def __post_init__(self):
+        super().__post_init__()
 
     @partial(jax.jit, static_argnums=(0,))
     def agent_dynamics(self, x, u):

@@ -4,6 +4,7 @@ from flax import struct
 from functools import partial
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+from dataclasses import dataclass, field
 from matplotlib.animation import FuncAnimation, PillowWriter
 from matplotlib.patches import Circle
 
@@ -16,24 +17,27 @@ class State:
     collision: jnp.ndarray
 
 
+@dataclass(eq=False)
 class MultiBase:
-    def __init__(self, num_agents):
-        self.num_agents = num_agents
-        self.obsv_dim_agent = 1000
-        self.pos_dim_agent = 1000
-        self.diameter = 1000
-        self.safe_margin = 1000
-        self.agent_radius = 1000
-        self.stop_distance = self.agent_radius / 2
-        self.stop_velocity = 1000
-        self.offset = 1
+    num_agents: int
+    obsv_dim_agent: int = 1000
+    pos_dim_agent: int = 1000
 
-        initial_states, goal_states = self.generate_positions(self.diameter, num_agents)
+    diameter: float = 1000
+    safe_margin: float = 1000
+    agent_radius: float = 1000
+    stop_velocity: float = 1000
+    offset: int = 1
+    stop_distance: float = field(init=False)
+
+    def __post_init__(self):
+        self.stop_distance: float = (
+            self.agent_radius / 2
+        )  # max distance to goal for termination
+        self.x0, self.xg = self.generate_positions(self.diameter, self.num_agents)
         self.lim = self.diameter / 2 + 1
-
-        self.x0 = initial_states.flatten()
-        self.xg = goal_states.flatten()
         self.max_distance = self.diameter
+        self.max_distances = jnp.linalg.norm(self.x0 - self.xg, axis=1)
 
     def generate_positions(self, diameter, num_agents):
         radius = diameter / 2.0
@@ -89,14 +93,8 @@ class MultiBase:
         margin_factor: int = 1,
         dt: float = 0.1,
     ):
-        init_pos = self.x0.reshape(self.num_agents, -1)
-        goal_pos = self.xg.reshape(self.num_agents, -1)
-        max_distances = jnp.linalg.norm(init_pos - goal_pos, axis=1)
-
         def step_wrapper(state: State, u: jax.Array):
-            state = self.step(
-                state, u, max_distances, penalty_weight, use_mask, margin_factor, dt
-            )
+            state = self.step(state, u, penalty_weight, use_mask, margin_factor, dt)
             return state, (
                 state.reward,
                 state.pipeline_state,
@@ -117,16 +115,14 @@ class MultiBase:
         self,
         state: State,
         action: jax.Array,
-        max_distances: jax.Array,
         penalty_weight: float = 1.0,
         use_mask: bool = True,
         margin_factor: int = 1,
         dt: float = 0.1,
     ) -> State:
         """Step Once"""
-        q = state.pipeline_state.reshape(self.num_agents, -1)
+        q = state.pipeline_state
         actions = action.reshape(self.num_agents, -1)
-        goals = self.xg.reshape(self.num_agents, -1)
 
         # Get new q
         q_new = jax.vmap(
@@ -146,7 +142,7 @@ class MultiBase:
                 agent_position[: self.pos_dim_agent]
                 - goal_position[: self.pos_dim_agent]
             )
-        )(q_new, goals)
+        )(q_new, self.xg)
 
         curr_vel = self.get_current_velocity(q)
         stop_update_mask = (dist_to_goals < self.stop_distance) & (
@@ -160,7 +156,6 @@ class MultiBase:
         agent_wise_reward, collision = self.get_reward(
             q=q_new,
             distances_to_goals=dist_to_goals,
-            max_distances=max_distances,
             penalty_weight=penalty_weight,
             margin_factor=margin_factor,
         )
@@ -169,7 +164,7 @@ class MultiBase:
         collision = collision.astype(float)
 
         return state.replace(
-            pipeline_state=q_new.flatten(),
+            pipeline_state=q_new,
             reward=agent_wise_reward,
             mask=mask,
             collision=collision,
@@ -180,14 +175,13 @@ class MultiBase:
         self,
         q: jax.Array,
         distances_to_goals: jax.Array,
-        max_distances: jax.Array,
         penalty_weight: float = 1.0,
         margin_factor: int = 1,
     ) -> float:
         agent_positions = q[:, : self.pos_dim_agent]
 
         # Calculate rewards using distance
-        rewards = 1.0 - distances_to_goals / max_distances
+        rewards = 1.0 - distances_to_goals / self.max_distances
 
         # Compute pairwise penalties
         pairwise_differences = agent_positions[:, None, :] - agent_positions[None, :, :]
@@ -228,9 +222,6 @@ class MultiBase:
     def render_gif(
         self, xs: jnp.ndarray, gif_output_path, trajectory_image_path, ids=None
     ):
-        # Reshape trajectory for rendering
-        xs = xs.reshape(-1, self.num_agents, self.obsv_dim_agent)
-
         # --- Initialize GIF Rendering ---
         fig, ax = plt.subplots(constrained_layout=True)
         ax.set(xlim=(-self.lim, self.lim), ylim=(-self.lim, self.lim), aspect="equal")
@@ -351,12 +342,8 @@ class MultiBase:
                 n_agents=self.num_agents,
                 terminals=[
                     dict(
-                        start=self.x0[
-                            i * self.obsv_dim_agent : i + 1 * self.obsv_dim_agent
-                        ].tolist(),
-                        goal=self.xg[
-                            i * self.obsv_dim_agent : i + 1 * self.obsv_dim_agent
-                        ].tolist(),
+                        start=self.x0[i].tolist(),
+                        goal=self.xg[i].tolist(),
                     )
                     for i in range(self.num_agents)
                 ],

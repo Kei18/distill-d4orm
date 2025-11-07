@@ -162,6 +162,7 @@ def main(args: Args):
     U_base, aux = d4orm(cfg=cfg, env=env)
     elapsed_time = time.time() - start_time
     rews, states, goal_masks, collisions = aux["rollout"]
+    actions = U_base.reshape(U_base.shape[0], env.num_agents, -1)
 
     # compute metrics
     num_collisions = jnp.sum(collisions).item() / 2
@@ -189,14 +190,9 @@ def main(args: Args):
     sol["instance"] = env.asdict()
     sol["result"] = []
     for i in range(args.Nagent):
-        actions_i = U_base[
-            :max_steps_to_goal,
-            i * env.action_dim_agent : (i + 1) * env.action_dim_agent,
-        ].tolist()
-        states_i = states[
-            :max_steps_to_goal:, i * env.obsv_dim_agent : (i + 1) * env.obsv_dim_agent
-        ].tolist()
-        sol["result"].append(dict(actions=actions_i, states=states_i))
+        x_i = states[:max_steps_to_goal, i].tolist()
+        u_i = actions[:max_steps_to_goal, i].tolist()
+        sol["result"].append(dict(actions=u_i, states=x_i))
 
     # save results
     if args.save_data:
