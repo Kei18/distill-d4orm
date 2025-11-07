@@ -179,3 +179,4 @@ results/
 
 .vscode/
 outputs/
+/**/.virtual_documents/

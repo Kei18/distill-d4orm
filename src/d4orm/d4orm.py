@@ -12,12 +12,10 @@ from dacite import from_dict, Config
 import tyro
 import jax
 from jax import numpy as jnp, config
-from scipy.interpolate import interp1d
 
-from envs import get_env
-from envs.multibase import MultiBase
-
-from utils import configure_logger
+from .envs import get_env
+from .envs.multibase import MultiBase
+from .utils import configure_logger
 
 config.update("jax_default_matmul_precision", "float32")
 
@@ -40,25 +38,9 @@ class D4ormCfg:
         Ndiffuse_ref = 100
         betas_ref = jnp.linspace(self.beta1, self.betaT, Ndiffuse_ref)
         betas_ref = jnp.concatenate([jnp.array([0.0]), betas_ref])
-        alphas_ref = 1.0 - betas_ref
-        alphas_bar_ref = jnp.cumprod(alphas_ref)
-
-        # Interpolate alphas_bar to maintain the same noise schedule
-        interp_func = interp1d(
-            jnp.linspace(0, 1, Ndiffuse_ref + 1),
-            alphas_bar_ref,
-            kind="linear",
-            fill_value="extrapolate",
-        )
-        alphas_bar = jnp.array(interp_func(jnp.linspace(0, 1, self.Ndiffuse + 1)))
-        alphas = jnp.concatenate([alphas_bar[:1], alphas_bar[1:] / alphas_bar[:-1]])
-
+        alphas = 1.0 - betas_ref
+        alphas_bar = jnp.cumprod(alphas)
         sigmas = jnp.sqrt(1 / alphas_bar - 1)
-        Sigmas_cond = (
-            (1 - alphas) * (1 - jnp.sqrt(jnp.roll(alphas_bar, 1))) / (1 - alphas_bar)
-        )
-        sigmas_cond = jnp.sqrt(Sigmas_cond)
-        sigmas_cond = sigmas_cond.at[0].set(0.0)
 
         # used during denoising procedure
         self.rng = jax.random.PRNGKey(seed=self.seed)
