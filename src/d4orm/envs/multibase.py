@@ -21,6 +21,7 @@ class EnvConfig:
     stop_velocity: float = 0.1  # max velocity for termination when reach the goal
     use_mask: bool = True  # masking
     penalty_weight: float = 1.0  # collision penalty
+    safe_margin: float = 0.02
 
 
 @dataclass(eq=False)
@@ -28,7 +29,6 @@ class MultiBase(EnvConfig):
     obsv_dim_agent: int = 1000
     pos_dim_agent: int = 1000
     diameter: float = 1000
-    safe_margin: float = 0.1
     agent_radius: float = 1000
     stop_velocity: float = 1000
 
@@ -171,16 +171,16 @@ class MultiBase(EnvConfig):
         pairwise_distances = jnp.linalg.norm(pairwise_differences, axis=-1)
         mask = ~jnp.eye(self.num_agents, dtype=bool)  # Mask for non-diagonal elements
         valid_distances = jnp.where(mask, pairwise_distances, jnp.inf)
-        agent_collision_threshold = 2 * self.agent_radius + self.safe_margin
 
-        penalties_agent = jnp.where(
-            valid_distances <= agent_collision_threshold, 1.0, 0.0
-        )
+        hard_th = 2 * self.agent_radius
+        soft_th = hard_th + self.safe_margin
 
-        collision = jnp.any(penalties_agent != 0.0, axis=1)
+        hard_col_agent = jnp.where(valid_distances <= hard_th, 1.0, 0.0)
+        soft_col_agent = jnp.where(valid_distances <= soft_th, 1.0, 0.0)
+        collision = jnp.any(hard_col_agent != 0.0, axis=1)
 
         # Compute agent-wise reward
-        total_agent_penalty = penalties_agent.sum(axis=1) * self.penalty_weight
+        total_agent_penalty = soft_col_agent.sum(axis=1) * self.penalty_weight
         rewards = rewards - total_agent_penalty
 
         # Calculate total reward
