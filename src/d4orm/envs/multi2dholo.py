@@ -12,10 +12,10 @@ class Multi2dHolo(MultiBase):
     pos_dim_agent: int = 2
     action_dim_agent: int = 2
 
-    diameter: float = 5
+    diameter: float = 5.0
     safe_margin: float = 0.05
     agent_radius: float = 0.25
-    stop_velocity: float = 0.1  # max velocity for termination when reach the goal
+
     mv: float = 5.0  # max velocity
     ma: float = 2.0  # max acceleration
 

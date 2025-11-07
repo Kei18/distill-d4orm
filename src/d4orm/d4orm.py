@@ -13,8 +13,8 @@ import tyro
 import jax
 from jax import numpy as jnp, config
 
-from .envs import get_env
-from .envs.multibase import MultiBase
+from .envs import get_env_cls
+from .envs.multibase import MultiBase, EnvConfig
 from .viz import save_anim, save_img
 from .utils import configure_logger
 
@@ -108,11 +108,14 @@ def d4orm(
         rews, states, goal_masks, collisions = rollout_env_jit(us=U_base)
 
         # mask out actions after reach and stop at the goal
-        idx_first_1 = jnp.argmax(goal_masks, axis=0)
-        cols = jnp.arange(goal_masks.shape[-1])
-        goal_masks_action = goal_masks.at[idx_first_1, cols].set(0)
-        goal_masks_action = jnp.repeat(goal_masks_action, repeats=Nu // Nagent, axis=-1)
-        U_base = U_base * (1 - goal_masks_action)
+        if env.use_mask:
+            idx_first_1 = jnp.argmax(goal_masks, axis=0)
+            cols = jnp.arange(goal_masks.shape[-1])
+            goal_masks_action = goal_masks.at[idx_first_1, cols].set(0)
+            goal_masks_action = jnp.repeat(
+                goal_masks_action, repeats=Nu // Nagent, axis=-1
+            )
+            U_base = U_base * (1 - goal_masks_action)
 
         # compute metrics
         num_collisions = int(jnp.sum(collisions).item() / 2)
@@ -131,10 +134,9 @@ def d4orm(
 
 
 @dataclass
-class Args(D4ormCfg):
+class Args(EnvConfig, D4ormCfg):
     # env
     env_name: str = "multi2dholo"
-    Nagent: int = 8  # number of agents
     # result
     save_img: bool = True
     save_gif: bool = False
@@ -144,8 +146,9 @@ class Args(D4ormCfg):
 def main(args: Args):
     configure_logger(args.logger)
 
-    ## setup env
-    env = get_env(args.env_name, args.Nagent)
+    # setup env
+    env_cls = get_env_cls(args.env_name)
+    env = from_dict(env_cls, asdict(args), config=Config(strict=False))
 
     # set d4orm parameters
     cfg = from_dict(D4ormCfg, asdict(args), config=Config(strict=False))

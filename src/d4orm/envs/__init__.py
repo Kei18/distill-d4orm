@@ -1,8 +1,8 @@
 from .multi2dholo import Multi2dHolo
 
 
-def get_env(env_name: str, num_agents: int):
+def get_env_cls(env_name: str):
     if env_name == "multi2dholo":
-        return Multi2dHolo(num_agents=num_agents)
+        return Multi2dHolo
     else:
         raise ValueError(f"Unknown environment: {env_name}")

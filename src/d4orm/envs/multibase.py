@@ -14,29 +14,27 @@ class State:
 
 
 @dataclass(eq=False)
-class MultiBase:
-    num_agents: int
+class EnvConfig:
+    num_agents: int = 2  # number of agents
+    dt: float = 0.1
+    stop_distance: float = 0.1
+    stop_velocity: float = 0.1  # max velocity for termination when reach the goal
+    use_mask: bool = True  # masking
+    penalty_weight: float = 1.0  # collision penalty
+
+
+@dataclass(eq=False)
+class MultiBase(EnvConfig):
     obsv_dim_agent: int = 1000
     pos_dim_agent: int = 1000
-
     diameter: float = 1000
     safe_margin: float = 1000
     agent_radius: float = 1000
     stop_velocity: float = 1000
 
-    dt: float = 0.1
-    use_mask: bool = True
-
-    penalty_weight: float = 1.0
-    margin_factor: int = 1
-
     def __post_init__(self):
-        self.stop_distance: float = (
-            self.agent_radius / 2
-        )  # max distance to goal for termination
         self.x0, self.xg = self.generate_positions(self.diameter, self.num_agents)
         self.lim = self.diameter / 2 + 1
-        self.max_distance = self.diameter
         self.max_distances = jnp.linalg.norm(self.x0 - self.xg, axis=1)
 
     def generate_positions(self, diameter, num_agents):
@@ -173,9 +171,7 @@ class MultiBase:
         pairwise_distances = jnp.linalg.norm(pairwise_differences, axis=-1)
         mask = ~jnp.eye(self.num_agents, dtype=bool)  # Mask for non-diagonal elements
         valid_distances = jnp.where(mask, pairwise_distances, jnp.inf)
-        agent_collision_threshold = (
-            2 * self.agent_radius + self.safe_margin * self.margin_factor
-        )
+        agent_collision_threshold = 2 * self.agent_radius + self.safe_margin
 
         penalties_agent = jnp.where(
             valid_distances <= agent_collision_threshold, 1.0, 0.0
@@ -200,9 +196,6 @@ class MultiBase:
 
     def get_heading_line(self, state, position, agent_idx):
         return [], []
-
-    def save_traj(self, Y, filename):
-        raise NotImplementedError
 
     def asdict(self) -> dict:
         # TODO: to be improved
