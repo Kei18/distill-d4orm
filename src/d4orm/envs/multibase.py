@@ -2,7 +2,7 @@ import jax
 from jax import numpy as jnp
 from flax import struct
 from functools import partial
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @struct.dataclass
@@ -23,7 +23,12 @@ class MultiBase:
     safe_margin: float = 1000
     agent_radius: float = 1000
     stop_velocity: float = 1000
-    stop_distance: float = field(init=False)
+
+    dt: float = 0.1
+    use_mask: bool = True
+
+    penalty_weight: float = 1.0
+    margin_factor: int = 1
 
     def __post_init__(self):
         self.stop_distance: float = (
@@ -75,21 +80,14 @@ class MultiBase:
         raise NotImplementedError
 
     @partial(jax.jit, static_argnums=(0,))
-    def euler(self, x, u, dt):
-        x_next = x + dt * self.agent_dynamics(x, u)
+    def euler(self, x, u):
+        x_next = x + self.dt * self.agent_dynamics(x, u)
         return self.clip_velocity(x_next)
 
     @partial(jax.jit, static_argnums=(0,))
-    def rollout(
-        self,
-        us: jax.Array,
-        penalty_weight: float = 1.0,
-        use_mask: bool = True,
-        margin_factor: int = 1,
-        dt: float = 0.1,
-    ):
+    def rollout(self, us: jax.Array):
         def step_wrapper(state: State, u: jax.Array):
-            state = self.step(state, u, penalty_weight, use_mask, margin_factor, dt)
+            state = self.step(state, u)
             return state, (
                 state.reward,
                 state.pipeline_state,
@@ -110,10 +108,6 @@ class MultiBase:
         self,
         state: State,
         action: jax.Array,
-        penalty_weight: float = 1.0,
-        use_mask: bool = True,
-        margin_factor: int = 1,
-        dt: float = 0.1,
     ) -> State:
         """Step Once"""
         q = state.pipeline_state
@@ -121,7 +115,7 @@ class MultiBase:
 
         # Get new q
         q_new = jax.vmap(
-            lambda agent_state, agent_action: self.euler(agent_state, agent_action, dt)
+            lambda agent_state, agent_action: self.euler(agent_state, agent_action)
         )(q, actions)
 
         # Don't update for stopped state
@@ -129,7 +123,7 @@ class MultiBase:
             state.mask, (self.num_agents,)
         ).astype(bool)
         q_new = jnp.where(
-            use_mask, jnp.where(previously_stopped_mask[:, None], q, q_new), q_new
+            self.use_mask, jnp.where(previously_stopped_mask[:, None], q, q_new), q_new
         )
 
         dist_to_goals = jax.vmap(
@@ -151,8 +145,6 @@ class MultiBase:
         agent_wise_reward, collision = self.get_reward(
             q=q_new,
             distances_to_goals=dist_to_goals,
-            penalty_weight=penalty_weight,
-            margin_factor=margin_factor,
         )
 
         mask = combined_stop_mask.astype(float)
@@ -170,8 +162,6 @@ class MultiBase:
         self,
         q: jax.Array,
         distances_to_goals: jax.Array,
-        penalty_weight: float = 1.0,
-        margin_factor: int = 1,
     ) -> float:
         agent_positions = q[:, : self.pos_dim_agent]
 
@@ -184,7 +174,7 @@ class MultiBase:
         mask = ~jnp.eye(self.num_agents, dtype=bool)  # Mask for non-diagonal elements
         valid_distances = jnp.where(mask, pairwise_distances, jnp.inf)
         agent_collision_threshold = (
-            2 * self.agent_radius + self.safe_margin * margin_factor
+            2 * self.agent_radius + self.safe_margin * self.margin_factor
         )
 
         penalties_agent = jnp.where(
@@ -194,7 +184,7 @@ class MultiBase:
         collision = jnp.any(penalties_agent != 0.0, axis=1)
 
         # Compute agent-wise reward
-        total_agent_penalty = penalties_agent.sum(axis=1) * penalty_weight
+        total_agent_penalty = penalties_agent.sum(axis=1) * self.penalty_weight
         rewards = rewards - total_agent_penalty
 
         # Calculate total reward
@@ -215,6 +205,7 @@ class MultiBase:
         raise NotImplementedError
 
     def asdict(self) -> dict:
+        # TODO: to be improved
         ret = dict(
             environment=dict(
                 workspace_min=[-10] * self.pos_dim_agent,

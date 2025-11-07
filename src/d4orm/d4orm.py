@@ -31,7 +31,6 @@ class D4ormCfg:
     temp_sample: float = 0.3  # temperature for sampling
     beta1: float = 1e-4  # initial beta
     betaT: float = 2e-2  # final beta
-    dt: float = 0.1
     anytime: bool = False
 
     def __post_init__(self):
@@ -54,13 +53,7 @@ def d4orm(
     env: MultiBase,
     U_base: jax.Array | None = None,
 ):
-    rollout_env_jit = partial(
-        env.rollout,
-        penalty_weight=1.0,
-        use_mask=True,
-        margin_factor=1,
-        dt=cfg.dt,
-    )
+    rollout_env_jit = partial(env.rollout)
     Nagent = env.num_agents
     Nu = env.action_size
 
@@ -143,8 +136,8 @@ class Args(D4ormCfg):
     env_name: str = "multi2dholo"
     Nagent: int = 8  # number of agents
     # result
-    save_img: bool = False
-    save_gif: bool = True
+    save_img: bool = True
+    save_gif: bool = False
     logger: str = "DEBUG"
 
 
@@ -190,7 +183,7 @@ def main(args: Args):
     for key, val in sol.items():
         logger.info(f"- {key:30s}: {val}")
 
-    sol["dt"] = cfg.dt
+    sol["dt"] = env.dt
     sol["instance"] = env.asdict()
     sol["result"] = []
     for i in range(env.num_agents):
