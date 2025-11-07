@@ -51,13 +51,10 @@ class D4ormCfg:
 def d4orm(
     cfg: D4ormCfg,
     env: MultiBase,
-    state_init,
     U_base: jax.Array | None = None,
 ):
     rollout_env_jit = partial(
         env.rollout,
-        state=state_init,
-        xg=env.xg,
         penalty_weight=1.0,
         use_mask=True,
         margin_factor=1,
@@ -152,19 +149,17 @@ class Args(D4ormCfg):
 
 def main(args: Args):
     configure_logger(args.logger)
-    rng = jax.random.PRNGKey(seed=args.seed)
+    # rng = jax.random.PRNGKey(seed=args.seed)
 
     ## setup env
     env = get_env(args.env_name, args.Nagent)
-    rng, rng_sub = jax.random.split(rng)
-    state_init = env.reset(rng_sub)
 
     # set d4orm parameters
     cfg = from_dict(D4ormCfg, asdict(args), config=Config(strict=False))
 
     ## run d4orm
     start_time = time.time()
-    U_base, aux = d4orm(cfg=cfg, env=env, state_init=state_init)
+    U_base, aux = d4orm(cfg=cfg, env=env)
     elapsed_time = time.time() - start_time
     rews, states, goal_masks, collisions = aux["rollout"]
 

@@ -50,17 +50,10 @@ class MultiBase:
         goal_states = -initial_states
         return initial_states, goal_states
 
-    def reset(self, rng: jax.Array):
+    @property
+    def state_init(self):
         return State(
             pipeline_state=self.x0,
-            reward=jnp.zeros(self.num_agents, dtype=jnp.float32),
-            mask=jnp.zeros(self.num_agents, dtype=jnp.float32),
-            collision=jnp.zeros(self.num_agents, dtype=jnp.float32),
-        )
-
-    def reset_conditioned(self, x0: jax.Array, rng: jax.Array):
-        return State(
-            pipeline_state=x0,
             reward=jnp.zeros(self.num_agents, dtype=jnp.float32),
             mask=jnp.zeros(self.num_agents, dtype=jnp.float32),
             collision=jnp.zeros(self.num_agents, dtype=jnp.float32),
@@ -90,21 +83,19 @@ class MultiBase:
     @partial(jax.jit, static_argnums=(0,))
     def rollout(
         self,
-        state: State,
-        xg: jax.Array,
         us: jax.Array,
         penalty_weight: float = 1.0,
         use_mask: bool = True,
         margin_factor: int = 1,
         dt: float = 0.1,
     ):
-        init_pos = state.pipeline_state.reshape(self.num_agents, -1)
-        goal_pos = xg.reshape(self.num_agents, -1)
+        init_pos = self.x0.reshape(self.num_agents, -1)
+        goal_pos = self.xg.reshape(self.num_agents, -1)
         max_distances = jnp.linalg.norm(init_pos - goal_pos, axis=1)
 
         def step_wrapper(state: State, u: jax.Array):
             state = self.step(
-                state, xg, u, max_distances, penalty_weight, use_mask, margin_factor, dt
+                state, u, max_distances, penalty_weight, use_mask, margin_factor, dt
             )
             return state, (
                 state.reward,
@@ -114,7 +105,7 @@ class MultiBase:
             )
 
         _, (rews, pipline_states, masks, collisions) = jax.lax.scan(
-            step_wrapper, state, us
+            step_wrapper, self.state_init, us
         )
 
         rews = rews.mean(axis=0)
@@ -125,7 +116,6 @@ class MultiBase:
     def step(
         self,
         state: State,
-        xg: jax.Array,
         action: jax.Array,
         max_distances: jax.Array,
         penalty_weight: float = 1.0,
@@ -136,7 +126,7 @@ class MultiBase:
         """Step Once"""
         q = state.pipeline_state.reshape(self.num_agents, -1)
         actions = action.reshape(self.num_agents, -1)
-        goals = xg.reshape(self.num_agents, -1)
+        goals = self.xg.reshape(self.num_agents, -1)
 
         # Get new q
         q_new = jax.vmap(
