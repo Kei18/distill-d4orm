@@ -15,6 +15,7 @@ from jax import numpy as jnp, config
 
 from .envs import get_env
 from .envs.multibase import MultiBase
+from .viz import save_anim, save_img
 from .utils import configure_logger
 
 config.update("jax_default_matmul_precision", "float32")
@@ -142,14 +143,13 @@ class Args(D4ormCfg):
     env_name: str = "multi2dholo"
     Nagent: int = 8  # number of agents
     # result
-    save_images: bool = False
-    save_data: bool = True
+    save_img: bool = False
+    save_gif: bool = True
     logger: str = "DEBUG"
 
 
 def main(args: Args):
     configure_logger(args.logger)
-    # rng = jax.random.PRNGKey(seed=args.seed)
 
     ## setup env
     env = get_env(args.env_name, args.Nagent)
@@ -166,10 +166,14 @@ def main(args: Args):
 
     # compute metrics
     num_collisions = jnp.sum(collisions).item() / 2
-    goal_reach_rate = jnp.count_nonzero(goal_masks[-1]).item() / args.Nagent
-    avg_steps_to_goal = (jnp.sum(goal_masks == 0) // args.Nagent).item()
+    goal_reach_rate = jnp.count_nonzero(goal_masks[-1]).item() / env.num_agents
+    avg_steps_to_goal = (jnp.sum(goal_masks == 0) // env.num_agents).item()
     max_steps_to_goal = (jnp.max(jnp.argmax(goal_masks, axis=0))).item()
     rew_final = rews[: cfg.Hsample].mean().item()
+
+    # trimming
+    states = states[:max_steps_to_goal]
+    actions = actions[:max_steps_to_goal]
 
     # construct solution data
     sol = dict(
@@ -189,29 +193,26 @@ def main(args: Args):
     sol["dt"] = cfg.dt
     sol["instance"] = env.asdict()
     sol["result"] = []
-    for i in range(args.Nagent):
-        x_i = states[:max_steps_to_goal, i].tolist()
-        u_i = actions[:max_steps_to_goal, i].tolist()
+    for i in range(env.num_agents):
+        x_i = states[:, i].tolist()
+        u_i = actions[:, i].tolist()
         sol["result"].append(dict(actions=u_i, states=x_i))
 
     # save results
-    if args.save_data:
-        date_str = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-        output_dir = Path(__file__).parents[2] / f"outputs/{date_str}"
-        output_dir.mkdir(parents=True, exist_ok=True)
-        logger.info(f"saved in {output_dir}")
+    date_str = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    output_dir = Path(__file__).parents[2] / f"outputs/{date_str}"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    logger.info(f"saved in {output_dir}")
 
-        with open(output_dir / "config.yaml", "w") as f:
-            yaml.safe_dump(asdict(args), f)
-        with open(output_dir / "result.yaml", "w") as f:
-            yaml.safe_dump(sol, f)
+    with open(output_dir / "config.yaml", "w") as f:
+        yaml.safe_dump(asdict(args), f)
+    with open(output_dir / "result.yaml", "w") as f:
+        yaml.safe_dump(sol, f)
 
-        if args.save_images:
-            env.render_gif(
-                states[:max_steps_to_goal],
-                output_dir / "trajectories.gif",
-                output_dir / "trajectories.png",
-            )
+    if args.save_img:
+        save_img(env, states, output_dir / "trajectories.png")
+    if args.save_gif:
+        save_anim(env, states, output_dir / "trajectories.gif")
 
 
 if __name__ == "__main__":

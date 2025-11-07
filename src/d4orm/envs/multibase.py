@@ -2,11 +2,7 @@ import jax
 from jax import numpy as jnp
 from flax import struct
 from functools import partial
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
 from dataclasses import dataclass, field
-from matplotlib.animation import FuncAnimation, PillowWriter
-from matplotlib.patches import Circle
 
 
 @struct.dataclass
@@ -27,7 +23,6 @@ class MultiBase:
     safe_margin: float = 1000
     agent_radius: float = 1000
     stop_velocity: float = 1000
-    offset: int = 1
     stop_distance: float = field(init=False)
 
     def __post_init__(self):
@@ -215,108 +210,6 @@ class MultiBase:
 
     def get_heading_line(self, state, position, agent_idx):
         return [], []
-
-    def get_color(self, i, colormaps):
-        return cm.get_cmap(colormaps[i % len(colormaps)])
-
-    def render_gif(
-        self, xs: jnp.ndarray, gif_output_path, trajectory_image_path, ids=None
-    ):
-        # --- Initialize GIF Rendering ---
-        fig, ax = plt.subplots(constrained_layout=True)
-        ax.set(xlim=(-self.lim, self.lim), ylim=(-self.lim, self.lim), aspect="equal")
-
-        colormaps = ["Reds", "Greens", "Purples", "Oranges", "Blues"]
-        circles, headings = [], []
-
-        for i in range(self.num_agents):
-            cmap = self.get_color(i, colormaps)
-            color = cmap(0.6)
-
-            circle = Circle((0, 0), radius=self.agent_radius, facecolor=color)
-            ax.add_patch(circle)
-            circles.append(circle)
-
-            (heading,) = ax.plot([], [], color="black", lw=1.5)
-            headings.append(heading)
-
-        def update(frame):
-            for i, (circle, heading) in enumerate(zip(circles, headings)):
-                state = xs[frame * self.offset, i]
-                position = state[: self.pos_dim_agent]
-                circle.set_center(position)
-                x_line, y_line = self.get_heading_line(state, position, i)
-                heading.set_data(x_line, y_line)
-            return circles + headings
-
-        anim = FuncAnimation(
-            fig,
-            update,
-            frames=xs.shape[0] // self.offset + 1,
-            blit=True,
-            interval=100,
-        )
-
-        if gif_output_path != "None":
-            anim.save(gif_output_path, writer=PillowWriter(fps=10 // self.offset))
-        plt.close(fig)
-
-        # --- Generate Static Trajectory Image ---
-        xs = xs[:: self.offset]
-        fig_traj, ax_traj = plt.subplots()
-        ax_traj.set(
-            xlim=(-self.lim, self.lim), ylim=(-self.lim, self.lim), aspect="equal"
-        )
-        ax_traj.scatter([], [], color="k", alpha=0.5, label="Obstacle", s=200)
-
-        num_colormaps = len(colormaps)
-        for i in range(self.num_agents):
-            cmap_index = i % num_colormaps if ids is None else int(ids[i]) + 1
-            cmap = cm.get_cmap(colormaps[cmap_index])
-            color = cmap(0.6)
-
-            traj_x, traj_y = xs[:, i, 0], xs[:, i, 1]
-            ax_traj.plot(
-                traj_x, traj_y, color=color, linestyle="--", linewidth=1, alpha=0.5
-            )
-
-            start_circle = Circle(
-                (traj_x[0], traj_y[0]), self.agent_radius, color=color, zorder=5
-            )
-            ax_traj.add_artist(start_circle)
-
-        # --- Collision Detection ---
-        collision_positions = []
-        for t in range(xs.shape[0]):
-            positions = xs[t, :, : self.pos_dim_agent]
-            diffs = positions[:, None, :] - positions[None, :, :]
-            dists = jnp.linalg.norm(diffs, axis=-1)
-            collision_matrix = (dists < self.agent_radius * 2 + self.safe_margin) & (
-                dists > 0
-            )
-            for i in range(self.num_agents):
-                if jnp.any(collision_matrix[i]):
-                    collision_positions.append(positions[i])
-
-        for pos in collision_positions:
-            ax_traj.plot(pos[0], pos[1], "rx", markersize=10, markeredgewidth=1)
-
-        # --- Plot Goal Positions ---
-        xg_reshaped = self.xg.reshape(self.num_agents, -1)
-        goal_x, goal_y = xg_reshaped[:, 0], xg_reshaped[:, 1]
-        ax_traj.plot(
-            goal_x,
-            goal_y,
-            "+",
-            color="k",
-            alpha=0.5,
-            markersize=10,
-            markeredgewidth=1,
-            zorder=10,
-        )
-
-        fig_traj.savefig(trajectory_image_path, bbox_inches="tight", pad_inches=0.05)
-        plt.close(fig_traj)
 
     def save_traj(self, Y, filename):
         raise NotImplementedError
