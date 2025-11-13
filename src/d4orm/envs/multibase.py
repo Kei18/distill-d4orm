@@ -87,7 +87,7 @@ class MultiBase(EnvConfig):
             step_wrapper, self.state_init, us
         )
 
-        ctrl_effort = jnp.linalg.norm(jnp.diff(us, n=2, axis=0))
+        ctrl_effort = jnp.linalg.norm(jnp.diff(us, axis=0))
         rews = rews.mean(axis=0) - ctrl_effort * self.penalty_weight_jerk
 
         return rews, pipline_states, masks, collisions
