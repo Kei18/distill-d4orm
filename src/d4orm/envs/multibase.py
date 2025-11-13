@@ -4,6 +4,8 @@ from flax import struct
 from functools import partial
 from dataclasses import dataclass
 
+from .utils import generate_sphere_configuraiton
+
 
 @struct.dataclass
 class State:
@@ -15,6 +17,7 @@ class State:
 
 @dataclass(eq=False)
 class EnvConfig:
+    seed: int = 0
     num_agents: int = 2  # number of agents
     dt: float = 0.1
     stop_distance: float = 0.1
@@ -33,24 +36,16 @@ class MultiBase(EnvConfig):
     stop_velocity: float = 1000
 
     def __post_init__(self):
-        self.x0, self.xg = self.generate_positions(self.diameter, self.num_agents)
+        self.rng = jax.random.PRNGKey(seed=self.seed)
+        self.x0, self.xg = generate_sphere_configuraiton(
+            self.diameter,
+            self.num_agents,
+            self.obsv_dim_agent,
+            self.pos_dim_agent,
+            rng=self.rng,
+        )
         self.lim = self.diameter / 2 + 1
         self.max_distances = jnp.linalg.norm(self.x0 - self.xg, axis=1)
-
-    def generate_positions(self, diameter, num_agents):
-        radius = diameter / 2.0
-        angles = jnp.linspace(0, 2 * jnp.pi, num_agents, endpoint=False)
-        position_components = [
-            radius * jnp.cos(angles),  # x
-            radius * jnp.sin(angles),  # y
-        ]
-        zero_components = [
-            jnp.zeros_like(angles)
-            for _ in range(self.obsv_dim_agent - self.pos_dim_agent)
-        ]
-        initial_states = jnp.stack(position_components + zero_components, axis=-1)
-        goal_states = -initial_states
-        return initial_states, goal_states
 
     @property
     def state_init(self):
