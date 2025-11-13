@@ -19,7 +19,7 @@ class EnvConfig:
     n_agents: int = 2  # number of agents
     dt: float = 0.1
     stop_distance: float = 0.1
-    stop_velocity: float = 0.1  # max velocity for termination when reach the goal
+    stop_velocity: float = 0.5  # max velocity for termination when reach the goal
     use_mask: bool = True  # masking
     penalty_weight_collision: float = 2.0  # collision penalty
     safe_margin: float = 0.02
