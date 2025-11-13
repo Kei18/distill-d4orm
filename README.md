@@ -51,7 +51,7 @@ CUDA_VISIBLE_DEVICES=3 uv run app.py --n_agents 10 --anytime --Niteration 30 --s
 ### Obstacles, start-goal specification
 
 ```sh
-uv run -m src.d4orm.d4orm --n-agents 2 --env-name 2dholo_custom --external_file assets/2dholo_custom.yaml
+uv run app.py --n-agents 2 --env-name 2dholo_custom --external_file assets/2dholo_custom.yaml
 ```
 
 ![](./assets/2dholo_custom.png)
