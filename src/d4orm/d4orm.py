@@ -149,6 +149,7 @@ def main(args: Args):
     # setup env
     env_cls = get_env_cls(args.env_name)
     env = from_dict(env_cls, asdict(args), config=Config(strict=False))
+    logger.info("finish env setup, start D4orm")
 
     # set d4orm parameters
     cfg = from_dict(D4ormCfg, asdict(args), config=Config(strict=False))

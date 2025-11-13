@@ -30,7 +30,6 @@ class EnvConfig:
 class MultiBase(EnvConfig):
     obsv_dim_agent: int = 1000
     pos_dim_agent: int = 1000
-    diameter: float = 1000
     agent_radius: float = 1000
     stop_velocity: float = 1000
 

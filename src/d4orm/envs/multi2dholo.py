@@ -15,8 +15,6 @@ class Multi2dHolo(MultiBase):
     obsv_dim_agent: int = 4
     pos_dim_agent: int = 2
     action_dim_agent: int = 2
-
-    diameter: float = 5.0
     agent_radius: float = 0.25
 
     mv: float = 5.0  # max velocity
@@ -27,7 +25,7 @@ class Multi2dHolo(MultiBase):
 
     def get_start_goal_configuration(self):
         return generate_sphere_configuraiton(
-            self.diameter,
+            5.0,
             self.n_agents,
             self.obsv_dim_agent,
             self.pos_dim_agent,
@@ -94,6 +92,39 @@ class Multi2dHolo(MultiBase):
                 max=[self.ma] * self.action_dim_agent,
             ),
         )
+
+
+@dataclass(eq=False)
+class Multi2dHoloRandom(Multi2dHolo):
+    workspace_size: float = 3.0
+
+    def get_start_goal_configuration(self):
+        _, rng = jax.random.split(self.rng)
+        th = self.agent_radius * 2 + self.safe_margin
+        starts, goals = [], []
+        params = dict(
+            shape=(2, self.pos_dim_agent),
+            minval=-self.workspace_size,
+            maxval=self.workspace_size,
+        )
+        dim_zero_states = self.obsv_dim_agent - self.pos_dim_agent
+
+        while len(starts) < self.n_agents:
+            _, rng = jax.random.split(rng)
+            s, g = jax.random.uniform(rng, **params)
+            if len(starts) > 0:
+                d_s = jnp.linalg.norm(
+                    jnp.array(starts)[:, : self.pos_dim_agent] - s, axis=1
+                )
+                d_g = jnp.linalg.norm(
+                    jnp.array(goals)[:, : self.pos_dim_agent] - g, axis=1
+                )
+                if any(d_s < th) or any(d_g < th):
+                    continue
+            starts.append(s.tolist() + [0] * dim_zero_states)
+            goals.append(g.tolist() + [0] * dim_zero_states)
+
+        return jnp.array(starts), jnp.array(goals)
 
 
 @dataclass(eq=False)

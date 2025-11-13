@@ -1,9 +1,11 @@
-from .multi2dholo import Multi2dHolo, Multi2dHoloCustom
+from .multi2dholo import Multi2dHolo, Multi2dHoloRandom, Multi2dHoloCustom
 
 
 def get_env_cls(env_name: str):
     if env_name in ["2dholo", "multi2dholo"]:
         return Multi2dHolo
+    if env_name in ["2dholo_random", "multi2dholo_random"]:
+        return Multi2dHoloRandom
     if env_name in ["2dholo_custom", "multi2dholo_custom"]:
         return Multi2dHoloCustom
     else:
