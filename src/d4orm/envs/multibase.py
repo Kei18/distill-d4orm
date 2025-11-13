@@ -131,7 +131,6 @@ class MultiBase(EnvConfig):
 
         agent_wise_reward, collision = self.get_reward(
             q=q_new,
-            actions=actions,
             distances_to_goals=dist_to_goals,
         )
 
@@ -149,7 +148,6 @@ class MultiBase(EnvConfig):
     def get_reward(
         self,
         q: jax.Array,
-        actions: jax.Array,
         distances_to_goals: jax.Array,
     ) -> float:
         agent_positions = q[:, : self.pos_dim_agent]

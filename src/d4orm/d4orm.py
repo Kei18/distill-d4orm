@@ -1,22 +1,12 @@
-from datetime import datetime
-
-import time
-from pathlib import Path
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from functools import partial
 
 from loguru import logger
-import yaml
-from dacite import from_dict, Config
 
-import tyro
 import jax
 from jax import numpy as jnp, config
 
-from .envs import get_env_cls
-from .envs.multibase import MultiBase, EnvConfig
-from .viz import save_anim, save_img
-from .utils import configure_logger
+from .envs.multibase import MultiBase
 
 config.update("jax_default_matmul_precision", "float32")
 
@@ -48,8 +38,7 @@ class D4ormCfg:
         self.sigmas = sigmas
 
 
-# @jax.disable_jit()
-def d4orm(
+def d4orm_opt(
     cfg: D4ormCfg,
     env: MultiBase,
     U_base: jax.Array | None = None,
@@ -134,84 +123,13 @@ def d4orm(
     )
 
 
-@dataclass
-class Args(EnvConfig, D4ormCfg):
-    # env
-    env_name: str = "multi2dholo"
-    # result
-    save_img: bool = True
-    save_gif: bool = False
-    logger: str = "DEBUG"
-
-
-def main(args: Args):
-    configure_logger(args.logger)
-
-    # setup env
-    env_cls = get_env_cls(args.env_name)
-    env = from_dict(env_cls, asdict(args), config=Config(strict=False))
-    logger.info(f"finish {env.__class__.__name__} setup, start D4orm")
-
-    # set d4orm parameters
-    cfg = from_dict(D4ormCfg, asdict(args), config=Config(strict=False))
-
-    ## run d4orm
-    start_time = time.time()
-    U_base, aux = d4orm(cfg=cfg, env=env)
-    elapsed_time = time.time() - start_time
+def get_metrics(aux):
     rews, states, goal_masks, collisions = aux["rollout"]
-    actions = U_base.reshape(U_base.shape[0], env.n_agents, -1)
-
-    # compute metrics
-    num_collisions = jnp.sum(collisions).item() / 2
-    goal_reach_rate = jnp.count_nonzero(goal_masks[-1]).item() / env.n_agents
-    avg_steps_to_goal = (jnp.sum(goal_masks == 0) // env.n_agents).item()
-    max_steps_to_goal = (jnp.max(jnp.argmax(goal_masks, axis=0))).item()
-    rew_final = rews[: cfg.Hsample].mean().item()
-
-    # trimming
-    states = states[:max_steps_to_goal]
-    actions = actions[:max_steps_to_goal]
-
-    # construct solution data
-    sol = dict(
-        success=(goal_reach_rate == 1.0 and num_collisions == 0),
-        goal_reach_rate=goal_reach_rate,
-        num_collisions=num_collisions,
-        elapsed_time_sec=elapsed_time,
-        num_denoising=aux["num_denoising"],
-        reward_final=rew_final,
-        average_steps_to_goal=avg_steps_to_goal,
-        max_steps_to_goal=max_steps_to_goal,
+    n_agents = states.shape[1]
+    return dict(
+        num_collisions=jnp.sum(collisions).item() / 2,
+        goal_reach_rate=jnp.count_nonzero(goal_masks[-1]).item() / n_agents,
+        avg_steps_to_goal=(jnp.sum(goal_masks == 0) // n_agents).item(),
+        max_steps_to_goal=(jnp.max(jnp.argmax(goal_masks, axis=0))).item(),
+        reward_final=rews.mean().item(),
     )
-    logger.info("results:")
-    for key, val in sol.items():
-        logger.info(f"- {key:30s}: {val}")
-
-    sol["dt"] = env.dt
-    sol["instance"] = env.asdict()
-    sol["result"] = []
-    for i in range(env.n_agents):
-        x_i = states[:, i].tolist()
-        u_i = actions[:, i].tolist()
-        sol["result"].append(dict(actions=u_i, states=x_i))
-
-    # save results
-    date_str = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-    output_dir = Path(__file__).parents[2] / f"outputs/{date_str}"
-    output_dir.mkdir(parents=True, exist_ok=True)
-    logger.info(f"saved in {output_dir}")
-
-    with open(output_dir / "config.yaml", "w") as f:
-        yaml.safe_dump(asdict(args), f)
-    with open(output_dir / "result.yaml", "w") as f:
-        yaml.safe_dump(sol, f)
-
-    if args.save_img:
-        save_img(env, states, output_dir / "trajectories.png")
-    if args.save_gif:
-        save_anim(env, states, output_dir / "trajectories.gif")
-
-
-if __name__ == "__main__":
-    main(args=tyro.cli(Args))

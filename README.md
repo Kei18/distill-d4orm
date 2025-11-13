@@ -28,7 +28,7 @@ uv sync --extra cuda12
 ## Run D4orm
 
 ```bash
-uv run -m src.d4orm.d4orm
+uv run app.py
 ```
 
 The results will be stored in the outputs/20XX directory.
@@ -36,13 +36,13 @@ The results will be stored in the outputs/20XX directory.
 To see available options:
 
 ```bash
-uv run -m src.d4orm.d4orm --help
+uv run app.py --help
 ```
 
 Example:
 
 ```sh
-CUDA_VISIBLE_DEVICES=3 uv run -m src.d4orm.d4orm --n_agents 10 --anytime --Niteration 30 --save-gif
+CUDA_VISIBLE_DEVICES=3 uv run app.py --n_agents 10 --anytime --Niteration 30 --save-gif
 ```
 
 ![](./assets/trajectories.gif)

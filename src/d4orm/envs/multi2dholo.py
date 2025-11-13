@@ -159,7 +159,6 @@ class Multi2dHoloCustom(Multi2dHolo):
     def get_reward(
         self,
         q: jax.Array,
-        actions: jax.Array,
         distances_to_goals: jax.Array,
     ) -> float:
         rewards, collision = super().get_reward(q, distances_to_goals)
