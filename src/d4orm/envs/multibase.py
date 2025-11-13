@@ -197,21 +197,17 @@ class MultiBase(EnvConfig):
     def get_heading_line(self, state, position, agent_idx):
         return [], []
 
+    @property
+    def env_constraints_dict(self):
+        raise NotImplementedError
+
     def asdict(self) -> dict:
-        # TODO: to be improved
         ret = dict(
             environment=dict(
                 workspace_min=[-10] * self.pos_dim_agent,
                 workspace_max=[10] * self.pos_dim_agent,
                 dynamics_type=self.__class__.__name__,
-                velocity_bounds=dict(
-                    min=[-self.mv] * self.pos_dim_agent,
-                    max=[self.mv] * self.pos_dim_agent,
-                ),
-                action_bounds=dict(
-                    min=[-self.ma] * self.action_dim_agent,
-                    max=[self.ma] * self.action_dim_agent,
-                ),
+                **self.env_constraints_dict,
                 robot_radius=self.agent_radius,
             ),
             problem=dict(

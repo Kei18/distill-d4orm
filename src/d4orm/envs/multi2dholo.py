@@ -35,9 +35,8 @@ class Multi2dHolo(MultiBase):
         """
         x_pos, y_pos, vx, vy = x
 
-        max_acceleration = self.ma
         acc_norm = jnp.linalg.norm(u)
-        scale_acc = jnp.minimum(1.0, max_acceleration / acc_norm)
+        scale_acc = jnp.minimum(1.0, self.ma / acc_norm)
         u = u * scale_acc
 
         x_dot = vx
@@ -69,3 +68,16 @@ class Multi2dHolo(MultiBase):
     @property
     def action_size(self):
         return self.action_dim_agent * self.num_agents
+
+    @property
+    def env_constraints_dict(self):
+        return dict(
+            velocity_bounds=dict(
+                min=[-self.mv] * self.pos_dim_agent,
+                max=[self.mv] * self.pos_dim_agent,
+            ),
+            action_bounds=dict(
+                min=[-self.ma] * self.action_dim_agent,
+                max=[self.ma] * self.action_dim_agent,
+            ),
+        )
