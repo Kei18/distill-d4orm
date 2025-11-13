@@ -17,7 +17,7 @@ def get_color(i):
 
 def set_ax_lim(ax, env: MultiBase, xs: jnp.ndarray) -> None:
     xmin = min(xs[:, :, 0].min(), env.xg[:, 0].min()) - 1
-    xmax = max(xs[:, :, 0].max() + 1, env.xg[:, 0].max()) + 1
+    xmax = max(xs[:, :, 0].max(), env.xg[:, 0].max()) + 1
     ymin = min(xs[:, :, 1].min(), env.xg[:, 1].min()) - 1
     ymax = max(xs[:, :, 1].max(), env.xg[:, 1].max()) + 1
     ax.set(xlim=(xmin, xmax), ylim=(ymin, ymax), aspect="equal")
