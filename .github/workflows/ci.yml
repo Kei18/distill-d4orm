@@ -19,3 +19,4 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - run: uv sync
       - run: uv run pytest -s
+      - run: uv run app.py
