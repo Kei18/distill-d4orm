@@ -6,6 +6,7 @@ from matplotlib.patches import Circle
 from pathlib import Path
 
 from .envs.multibase import MultiBase
+from .envs.multi2dholo import Multi2dHoloCustom
 
 COLORMAPS = ["Reds", "Greens", "Purples", "Oranges", "Blues"]
 
@@ -14,16 +15,27 @@ def get_color(i):
     return cm.get_cmap(COLORMAPS[i % len(COLORMAPS)])(0.6)
 
 
-def save_anim(
-    env: MultiBase, xs: jnp.ndarray, output_path: Path, ids=None, offset: int = 1
-):
-    fig, ax = plt.subplots(constrained_layout=True)
-
+def set_ax_lim(ax, env: MultiBase, xs: jnp.ndarray) -> None:
     xmin = min(xs[:, :, 0].min(), env.xg[:, 0].min()) - 1
     xmax = max(xs[:, :, 0].max() + 1, env.xg[:, 0].max()) + 1
     ymin = min(xs[:, :, 1].min(), env.xg[:, 1].min()) - 1
     ymax = max(xs[:, :, 1].max(), env.xg[:, 1].max()) + 1
     ax.set(xlim=(xmin, xmax), ylim=(ymin, ymax), aspect="equal")
+
+
+def set_obs(ax, env: MultiBase):
+    if isinstance(env, Multi2dHoloCustom):
+        for p, r in zip(env.obs_center, env.obs_rad):
+            c = Circle(p, r, color="black")
+            ax.add_artist(c)
+
+
+def save_anim(
+    env: MultiBase, xs: jnp.ndarray, output_path: Path, ids=None, offset: int = 1
+):
+    fig, ax = plt.subplots(constrained_layout=True)
+    set_ax_lim(ax, env, xs)
+    set_obs(ax, env)
 
     circles, headings = [], []
 
@@ -66,14 +78,8 @@ def save_img(
     # --- Generate Static Trajectory Image ---
     xs = xs[::offset]
     fig, ax = plt.subplots()
-
-    xmin = min(xs[:, :, 0].min(), env.xg[:, 0].min()) - 1
-    xmax = max(xs[:, :, 0].max() + 1, env.xg[:, 0].max()) + 1
-    ymin = min(xs[:, :, 1].min(), env.xg[:, 1].min()) - 1
-    ymax = max(xs[:, :, 1].max(), env.xg[:, 1].max()) + 1
-    ax.set(xlim=(xmin, xmax), ylim=(ymin, ymax), aspect="equal")
-
-    ax.scatter([], [], color="k", alpha=0.5, label="Obstacle", s=200)
+    set_ax_lim(ax, env, xs)
+    set_obs(ax, env)
 
     for i in range(env.n_agents):
         color = get_color(i)

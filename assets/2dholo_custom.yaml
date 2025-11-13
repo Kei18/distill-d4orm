@@ -1,9 +1,13 @@
 problem:
   n_obstacles: 2
   obstacles:
-  - center: [0.2, -0.5]
-    size: [0.1, 0.1]
-    type: box
+  - center: [0.0, 0.1]
+    size: [0.3]
+    type: circle
+  - center: [-0.5, 0.5]
+    size: [0.1]
+    type: circle
+    #
   n_agents: 2
   terminals:
   - start: [0.0, -1.0, 0, 0]   # robot-1, [px, py, vx, vy]

@@ -99,16 +99,53 @@ class Multi2dHolo(MultiBase):
 @dataclass(eq=False)
 class Multi2dHoloCustom(Multi2dHolo):
     def __post_init__(self):
+        with open(Path(self.external_file)) as f:
+            self.external_cfg = yaml.safe_load(f)
         super().__post_init__()
         self.max_distances = jnp.linalg.norm(self.x0 - self.xg, axis=1)
 
-    def get_start_goal_configuration(self):
-        with open(Path(self.external_file)) as f:
-            external_cfg = yaml.safe_load(f)
+        # set obstacles
+        obstacles = []
+        obstacles_rad = []
+        for o in self.external_cfg["problem"].get("obstacles", []):
+            obstacles.append(o["center"])
+            obstacles_rad.append(max(o["size"]))
+        self.obs_center = jnp.array(obstacles)
+        self.obs_rad = jnp.array(obstacles_rad)
 
+        # reward
+        self.penalty_weight_obs = self.penalty_weight * 2
+
+    def get_start_goal_configuration(self):
         starts, goals = [], []
-        for s_g in external_cfg["problem"]["terminals"][: self.n_agents]:
+        for s_g in self.external_cfg["problem"]["terminals"][: self.n_agents]:
             starts.append(s_g["start"])
             goals.append(s_g["goal"])
 
         return jnp.array(starts), jnp.array(goals)
+
+    @partial(jax.jit, static_argnums=(0,))
+    def get_reward(
+        self,
+        q: jax.Array,
+        distances_to_goals: jax.Array,
+    ) -> float:
+        rewards, collision = super().get_reward(q, distances_to_goals)
+
+        hard_th = self.agent_radius + self.obs_rad
+        soft_th = hard_th + self.safe_margin
+
+        agent_positions = q[:, : self.pos_dim_agent]
+        agent_obs_differences = (
+            agent_positions[:, None, :] - self.obs_center[None, :, :]
+        )
+        agent_obs_distances = jnp.linalg.norm(
+            agent_obs_differences, axis=-1
+        )  # Shape (Nagent, Nobs)
+
+        hard_col_obs = jnp.where(agent_obs_distances <= hard_th, 1.0, 0.0)
+        soft_col_obs = jnp.where(agent_obs_distances <= soft_th, 1.0, 0.0)
+
+        collision = jnp.logical_or(collision, jnp.any(hard_col_obs != 0.0, axis=1))
+        rewards -= soft_col_obs.sum(axis=1) * self.penalty_weight_obs
+        return rewards, collision

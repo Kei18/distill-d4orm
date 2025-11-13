@@ -41,11 +41,19 @@ uv run -m src.d4orm.d4orm --help
 Example:
 
 ```sh
-CUDA_VISIBLE_DEVICES=3 uv run -m src.d4orm.d4orm --Nagent 10 --anytime --Niteration 30 --save-images
+CUDA_VISIBLE_DEVICES=3 uv run -m src.d4orm.d4orm --n_agents 10 --anytime --Niteration 30 --save-gif
 ```
 
 ![](./assets/trajectories.gif)
 
+
+### Obstacles, start-goal specification
+
+```sh
+uv run -m src.d4orm.d4orm --n-agents 2 --env-name 2dholo_custom --external_file assets/2dholo_custom.yaml
+```
+
+![](./assets/2dholo_custom.png)
 
 
 ## Citation
