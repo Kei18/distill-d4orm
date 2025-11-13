@@ -22,7 +22,7 @@ from d4orm import (
 @dataclass
 class Args(EnvConfig, D4ormCfg):
     # env
-    env_name: str = "multi2dholo"
+    env_name: str = "2dholo"  # available: 2dholo, 2dholo_random, 2dholo_custom
     # result
     save_img: bool = True
     save_gif: bool = False
