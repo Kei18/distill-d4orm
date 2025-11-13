@@ -22,7 +22,6 @@ class EnvConfig:
     stop_velocity: float = 0.1  # max velocity for termination when reach the goal
     use_mask: bool = True  # masking
     penalty_weight_collision: float = 1.0  # collision penalty
-    penalty_weight_jerk: float = 1e-2
     safe_margin: float = 0.02
     external_file: str = ""
 
@@ -87,8 +86,7 @@ class MultiBase(EnvConfig):
             step_wrapper, self.state_init, us
         )
 
-        ctrl_effort = jnp.linalg.norm(jnp.diff(us, axis=0))
-        rews = rews.mean(axis=0) - ctrl_effort * self.penalty_weight_jerk
+        rews = rews.mean(axis=0)
 
         return rews, pipline_states, masks, collisions
 
