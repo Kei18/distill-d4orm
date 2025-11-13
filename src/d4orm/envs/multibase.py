@@ -22,6 +22,7 @@ class EnvConfig:
     stop_velocity: float = 0.1  # max velocity for termination when reach the goal
     use_mask: bool = True  # masking
     penalty_weight: float = 1.0  # collision penalty
+    control_weight: float = 1e-3
     safe_margin: float = 0.02
     external_file: str = ""
 
@@ -131,6 +132,7 @@ class MultiBase(EnvConfig):
 
         agent_wise_reward, collision = self.get_reward(
             q=q_new,
+            actions=actions,
             distances_to_goals=dist_to_goals,
         )
 
@@ -148,6 +150,7 @@ class MultiBase(EnvConfig):
     def get_reward(
         self,
         q: jax.Array,
+        actions: jax.Array,
         distances_to_goals: jax.Array,
     ) -> float:
         agent_positions = q[:, : self.pos_dim_agent]
@@ -170,6 +173,10 @@ class MultiBase(EnvConfig):
 
         # Compute agent-wise reward
         total_agent_penalty = soft_col_agent.sum(axis=1) * self.penalty_weight
+
+        # control effort
+        total_agent_penalty += jnp.linalg.norm(actions) * self.control_weight
+
         rewards = rewards - total_agent_penalty
 
         # Calculate total reward
