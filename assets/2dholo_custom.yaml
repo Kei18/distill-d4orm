@@ -1,0 +1,12 @@
+problem:
+  n_obstacles: 2
+  obstacles:
+  - center: [0.2, -0.5]
+    size: [0.1, 0.1]
+    type: box
+  n_agents: 2
+  terminals:
+  - start: [0.0, -1.0, 0, 0]   # robot-1, [px, py, vx, vy]
+    goal: [0.0, 1.5, 0, 0]
+  - start: [1.5, 0, 0, 0]      # robot-2
+    goal: [-1.0, 0, 0, 0]

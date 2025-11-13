@@ -54,7 +54,7 @@ def d4orm(
     U_base: jax.Array | None = None,
 ):
     rollout_env_jit = partial(env.rollout)
-    Nagent = env.num_agents
+    Nagent = env.n_agents
     Nu = env.action_size
 
     @jax.jit
@@ -158,12 +158,12 @@ def main(args: Args):
     U_base, aux = d4orm(cfg=cfg, env=env)
     elapsed_time = time.time() - start_time
     rews, states, goal_masks, collisions = aux["rollout"]
-    actions = U_base.reshape(U_base.shape[0], env.num_agents, -1)
+    actions = U_base.reshape(U_base.shape[0], env.n_agents, -1)
 
     # compute metrics
     num_collisions = jnp.sum(collisions).item() / 2
-    goal_reach_rate = jnp.count_nonzero(goal_masks[-1]).item() / env.num_agents
-    avg_steps_to_goal = (jnp.sum(goal_masks == 0) // env.num_agents).item()
+    goal_reach_rate = jnp.count_nonzero(goal_masks[-1]).item() / env.n_agents
+    avg_steps_to_goal = (jnp.sum(goal_masks == 0) // env.n_agents).item()
     max_steps_to_goal = (jnp.max(jnp.argmax(goal_masks, axis=0))).item()
     rew_final = rews[: cfg.Hsample].mean().item()
 
@@ -189,7 +189,7 @@ def main(args: Args):
     sol["dt"] = env.dt
     sol["instance"] = env.asdict()
     sol["result"] = []
-    for i in range(env.num_agents):
+    for i in range(env.n_agents):
         x_i = states[:, i].tolist()
         u_i = actions[:, i].tolist()
         sol["result"].append(dict(actions=u_i, states=x_i))

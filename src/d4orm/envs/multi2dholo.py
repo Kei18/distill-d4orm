@@ -5,6 +5,10 @@ from dataclasses import dataclass
 
 from .multibase import MultiBase
 
+from .utils import generate_sphere_configuraiton
+import yaml
+from pathlib import Path
+
 
 @dataclass(eq=False)
 class Multi2dHolo(MultiBase):
@@ -20,6 +24,15 @@ class Multi2dHolo(MultiBase):
 
     def __post_init__(self):
         super().__post_init__()
+
+    def get_start_goal_configuration(self):
+        return generate_sphere_configuraiton(
+            self.diameter,
+            self.n_agents,
+            self.obsv_dim_agent,
+            self.pos_dim_agent,
+            rng=self.rng,
+        )
 
     @partial(jax.jit, static_argnums=(0,))
     def agent_dynamics(self, x, u):
@@ -48,11 +61,11 @@ class Multi2dHolo(MultiBase):
 
     @partial(jax.jit, static_argnums=(0,))
     def clip_actions(self, traj: jax.Array, factor=1):
-        traj = traj.reshape(-1, self.num_agents, self.action_dim_agent)
+        traj = traj.reshape(-1, self.n_agents, self.action_dim_agent)
         norm = jnp.linalg.norm(traj, axis=-1, keepdims=True)
         scale = jnp.minimum(1.0, self.ma * factor / norm)
         traj = traj * scale
-        return traj.reshape(-1, self.action_dim_agent * self.num_agents)
+        return traj.reshape(-1, self.action_dim_agent * self.n_agents)
 
     def clip_velocity(self, x):
         vx, vy = x[2], x[3]
@@ -67,7 +80,7 @@ class Multi2dHolo(MultiBase):
 
     @property
     def action_size(self):
-        return self.action_dim_agent * self.num_agents
+        return self.action_dim_agent * self.n_agents
 
     @property
     def env_constraints_dict(self):
@@ -81,3 +94,21 @@ class Multi2dHolo(MultiBase):
                 max=[self.ma] * self.action_dim_agent,
             ),
         )
+
+
+@dataclass(eq=False)
+class Multi2dHoloCustom(Multi2dHolo):
+    def __post_init__(self):
+        super().__post_init__()
+        self.max_distances = jnp.linalg.norm(self.x0 - self.xg, axis=1)
+
+    def get_start_goal_configuration(self):
+        with open(Path(self.external_file)) as f:
+            external_cfg = yaml.safe_load(f)
+
+        starts, goals = [], []
+        for s_g in external_cfg["problem"]["terminals"][: self.n_agents]:
+            starts.append(s_g["start"])
+            goals.append(s_g["goal"])
+
+        return jnp.array(starts), jnp.array(goals)

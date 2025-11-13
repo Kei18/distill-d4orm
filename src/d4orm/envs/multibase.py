@@ -4,8 +4,6 @@ from flax import struct
 from functools import partial
 from dataclasses import dataclass
 
-from .utils import generate_sphere_configuraiton
-
 
 @struct.dataclass
 class State:
@@ -18,13 +16,14 @@ class State:
 @dataclass(eq=False)
 class EnvConfig:
     seed: int = 0
-    num_agents: int = 2  # number of agents
+    n_agents: int = 2  # number of agents
     dt: float = 0.1
     stop_distance: float = 0.1
     stop_velocity: float = 0.1  # max velocity for termination when reach the goal
     use_mask: bool = True  # masking
     penalty_weight: float = 1.0  # collision penalty
     safe_margin: float = 0.02
+    external_file: str = ""
 
 
 @dataclass(eq=False)
@@ -37,23 +36,19 @@ class MultiBase(EnvConfig):
 
     def __post_init__(self):
         self.rng = jax.random.PRNGKey(seed=self.seed)
-        self.x0, self.xg = generate_sphere_configuraiton(
-            self.diameter,
-            self.num_agents,
-            self.obsv_dim_agent,
-            self.pos_dim_agent,
-            rng=self.rng,
-        )
-        self.lim = self.diameter / 2 + 1
+        self.x0, self.xg = self.get_start_goal_configuration()
         self.max_distances = jnp.linalg.norm(self.x0 - self.xg, axis=1)
+
+    def get_start_goal_configuration(self):
+        raise NotImplementedError
 
     @property
     def state_init(self):
         return State(
             pipeline_state=self.x0,
-            reward=jnp.zeros(self.num_agents, dtype=jnp.float32),
-            mask=jnp.zeros(self.num_agents, dtype=jnp.float32),
-            collision=jnp.zeros(self.num_agents, dtype=jnp.float32),
+            reward=jnp.zeros(self.n_agents, dtype=jnp.float32),
+            mask=jnp.zeros(self.n_agents, dtype=jnp.float32),
+            collision=jnp.zeros(self.n_agents, dtype=jnp.float32),
         )
 
     @partial(jax.jit, static_argnums=(0,))
@@ -104,7 +99,7 @@ class MultiBase(EnvConfig):
     ) -> State:
         """Step Once"""
         q = state.pipeline_state
-        actions = action.reshape(self.num_agents, -1)
+        actions = action.reshape(self.n_agents, -1)
 
         # Get new q
         q_new = jax.vmap(
@@ -112,9 +107,9 @@ class MultiBase(EnvConfig):
         )(q, actions)
 
         # Don't update for stopped state
-        previously_stopped_mask = jnp.broadcast_to(
-            state.mask, (self.num_agents,)
-        ).astype(bool)
+        previously_stopped_mask = jnp.broadcast_to(state.mask, (self.n_agents,)).astype(
+            bool
+        )
         q_new = jnp.where(
             self.use_mask, jnp.where(previously_stopped_mask[:, None], q, q_new), q_new
         )
@@ -130,9 +125,9 @@ class MultiBase(EnvConfig):
         stop_update_mask = (dist_to_goals < self.stop_distance) & (
             curr_vel <= self.stop_velocity
         )
-        previously_stopped_mask = jnp.broadcast_to(
-            state.mask, (self.num_agents,)
-        ).astype(bool)
+        previously_stopped_mask = jnp.broadcast_to(state.mask, (self.n_agents,)).astype(
+            bool
+        )
         combined_stop_mask = stop_update_mask | previously_stopped_mask
 
         agent_wise_reward, collision = self.get_reward(
@@ -159,12 +154,12 @@ class MultiBase(EnvConfig):
         agent_positions = q[:, : self.pos_dim_agent]
 
         # Calculate rewards using distance
-        rewards = 1.0 - distances_to_goals / self.max_distances
+        rewards = 1.0 - distances_to_goals / (self.max_distances + 1e-5)
 
         # Compute pairwise penalties
         pairwise_differences = agent_positions[:, None, :] - agent_positions[None, :, :]
         pairwise_distances = jnp.linalg.norm(pairwise_differences, axis=-1)
-        mask = ~jnp.eye(self.num_agents, dtype=bool)  # Mask for non-diagonal elements
+        mask = ~jnp.eye(self.n_agents, dtype=bool)  # Mask for non-diagonal elements
         valid_distances = jnp.where(mask, pairwise_distances, jnp.inf)
 
         hard_th = 2 * self.agent_radius
@@ -187,7 +182,7 @@ class MultiBase(EnvConfig):
 
     @property
     def observation_size(self):
-        return self.obsv_dim_agent * self.num_agents
+        return self.obsv_dim_agent * self.n_agents
 
     def get_heading_line(self, state, position, agent_idx):
         return [], []
@@ -207,13 +202,13 @@ class MultiBase(EnvConfig):
             ),
             problem=dict(
                 n_obstacles=0,
-                n_agents=self.num_agents,
+                n_agents=self.n_agents,
                 terminals=[
                     dict(
                         start=self.x0[i].tolist(),
                         goal=self.xg[i].tolist(),
                     )
-                    for i in range(self.num_agents)
+                    for i in range(self.n_agents)
                 ],
             ),
         )

@@ -4,7 +4,7 @@ import jax.numpy as jnp
 
 def generate_sphere_configuraiton(
     diameter: float,
-    num_agents: int,
+    n_agents: int,
     obsv_dim_agent: int,
     pos_dim_agent: int,
     rng: jax.Array | None = None,
@@ -15,7 +15,7 @@ def generate_sphere_configuraiton(
         s = jax.random.uniform(rng, maxval=2 * jnp.pi).item()
 
     radius = diameter / 2.0
-    angles = jnp.linspace(s, s + 2 * jnp.pi, num_agents, endpoint=False)
+    angles = jnp.linspace(s, s + 2 * jnp.pi, n_agents, endpoint=False)
     position_components = [
         radius * jnp.cos(angles),  # x
         radius * jnp.sin(angles),  # y

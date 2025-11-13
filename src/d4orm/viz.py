@@ -18,11 +18,16 @@ def save_anim(
     env: MultiBase, xs: jnp.ndarray, output_path: Path, ids=None, offset: int = 1
 ):
     fig, ax = plt.subplots(constrained_layout=True)
-    ax.set(xlim=(-env.lim, env.lim), ylim=(-env.lim, env.lim), aspect="equal")
+
+    xmin = min(xs[:, :, 0].min(), env.xg[:, 0].min()) - 1
+    xmax = max(xs[:, :, 0].max() + 1, env.xg[:, 0].max()) + 1
+    ymin = min(xs[:, :, 1].min(), env.xg[:, 1].min()) - 1
+    ymax = max(xs[:, :, 1].max(), env.xg[:, 1].max()) + 1
+    ax.set(xlim=(xmin, xmax), ylim=(ymin, ymax), aspect="equal")
 
     circles, headings = [], []
 
-    for i in range(env.num_agents):
+    for i in range(env.n_agents):
         color = get_color(i)
         circle = Circle((0, 0), radius=env.agent_radius, facecolor=color)
         ax.add_patch(circle)
@@ -61,10 +66,16 @@ def save_img(
     # --- Generate Static Trajectory Image ---
     xs = xs[::offset]
     fig, ax = plt.subplots()
-    ax.set(xlim=(-env.lim, env.lim), ylim=(-env.lim, env.lim), aspect="equal")
+
+    xmin = min(xs[:, :, 0].min(), env.xg[:, 0].min()) - 1
+    xmax = max(xs[:, :, 0].max() + 1, env.xg[:, 0].max()) + 1
+    ymin = min(xs[:, :, 1].min(), env.xg[:, 1].min()) - 1
+    ymax = max(xs[:, :, 1].max(), env.xg[:, 1].max()) + 1
+    ax.set(xlim=(xmin, xmax), ylim=(ymin, ymax), aspect="equal")
+
     ax.scatter([], [], color="k", alpha=0.5, label="Obstacle", s=200)
 
-    for i in range(env.num_agents):
+    for i in range(env.n_agents):
         color = get_color(i)
 
         traj_x, traj_y = xs[:, i, 0], xs[:, i, 1]
@@ -84,7 +95,7 @@ def save_img(
         collision_matrix = (dists < env.agent_radius * 2 + env.safe_margin) & (
             dists > 0
         )
-        for i in range(env.num_agents):
+        for i in range(env.n_agents):
             if jnp.any(collision_matrix[i]):
                 collision_positions.append(positions[i])
 
@@ -92,7 +103,7 @@ def save_img(
         ax.plot(pos[0], pos[1], "rx", markersize=10, markeredgewidth=1)
 
     # --- Plot Goal Positions ---
-    xg_reshaped = env.xg.reshape(env.num_agents, -1)
+    xg_reshaped = env.xg.reshape(env.n_agents, -1)
     goal_x, goal_y = xg_reshaped[:, 0], xg_reshaped[:, 1]
     ax.plot(
         goal_x,
