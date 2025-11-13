@@ -145,7 +145,7 @@ class Multi2dHoloCustom(Multi2dHolo):
         self.obs_rad = jnp.array(obstacles_rad)
 
         # reward
-        self.penalty_weight_obs = self.penalty_weight * 2
+        self.penalty_weight_obs = self.penalty_weight_collision * 2
 
     def get_start_goal_configuration(self):
         starts, goals = [], []

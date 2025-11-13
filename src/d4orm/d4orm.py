@@ -48,12 +48,14 @@ class D4ormCfg:
         self.sigmas = sigmas
 
 
+# @jax.disable_jit()
 def d4orm(
     cfg: D4ormCfg,
     env: MultiBase,
     U_base: jax.Array | None = None,
 ):
     rollout_env_jit = partial(env.rollout)
+    rollout_fn = jax.vmap(rollout_env_jit, in_axes=(0))
     Nagent = env.n_agents
     Nu = env.action_size
 
@@ -70,7 +72,6 @@ def d4orm(
         U_is = eps_u * cfg.sigmas[i] + Ubar_i  # shape (Nsample, Hsample, Nu)
 
         # --- Step 3: rollout trajectories
-        rollout_fn = jax.vmap(rollout_env_jit, in_axes=(0))
         rewss, _, _, _ = rollout_fn(us=U_is + U_base)
 
         # normalization
@@ -149,7 +150,7 @@ def main(args: Args):
     # setup env
     env_cls = get_env_cls(args.env_name)
     env = from_dict(env_cls, asdict(args), config=Config(strict=False))
-    logger.info("finish env setup, start D4orm")
+    logger.info(f"finish {env.__class__.__name__} setup, start D4orm")
 
     # set d4orm parameters
     cfg = from_dict(D4ormCfg, asdict(args), config=Config(strict=False))

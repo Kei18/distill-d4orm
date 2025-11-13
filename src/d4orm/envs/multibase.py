@@ -21,8 +21,8 @@ class EnvConfig:
     stop_distance: float = 0.1
     stop_velocity: float = 0.1  # max velocity for termination when reach the goal
     use_mask: bool = True  # masking
-    penalty_weight: float = 1.0  # collision penalty
-    control_weight: float = 1e-3
+    penalty_weight_collision: float = 1.0  # collision penalty
+    penalty_weight_jerk: float = 1e-2
     safe_margin: float = 0.02
     external_file: str = ""
 
@@ -87,7 +87,8 @@ class MultiBase(EnvConfig):
             step_wrapper, self.state_init, us
         )
 
-        rews = rews.mean(axis=0)
+        ctrl_effort = jnp.linalg.norm(jnp.diff(us, n=2, axis=0))
+        rews = rews.mean(axis=0) - ctrl_effort * self.penalty_weight_jerk
 
         return rews, pipline_states, masks, collisions
 
@@ -172,10 +173,7 @@ class MultiBase(EnvConfig):
         collision = jnp.any(hard_col_agent != 0.0, axis=1)
 
         # Compute agent-wise reward
-        total_agent_penalty = soft_col_agent.sum(axis=1) * self.penalty_weight
-
-        # control effort
-        total_agent_penalty += jnp.linalg.norm(actions) * self.control_weight
+        total_agent_penalty = soft_col_agent.sum(axis=1) * self.penalty_weight_collision
 
         rewards = rewards - total_agent_penalty
 
