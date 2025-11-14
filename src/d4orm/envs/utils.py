@@ -22,11 +22,9 @@ def generate_sphere_configuraiton(
             radius * jnp.sin(angles),  # y
         ]
     elif pos_dim_agent == 3:
-        indices = jnp.arange(0, n_agents)
-        phi = jnp.arccos(s + 1 - 2 * (indices + 0.5) / n_agents)
-        _, rng = jax.random.split(rng)
-        s = jax.random.uniform(rng, maxval=2 * jnp.pi).item()
-        theta = s + jnp.pi * (1 + 5**0.5) * indices
+        indices = jnp.arange(n_agents)
+        phi = jnp.arccos(1 - 2 * (indices + 0.5) / n_agents)
+        theta = jnp.pi * (1 + 5**0.5) * indices
         position_components = [
             radius * jnp.sin(phi) * jnp.cos(theta),
             radius * jnp.sin(phi) * jnp.sin(theta),

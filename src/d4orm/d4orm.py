@@ -38,6 +38,7 @@ class D4ormCfg:
         self.sigmas = sigmas
 
 
+# @jax.disable_jit()  # useful for debugging
 def d4orm_opt(
     cfg: D4ormCfg,
     env: MultiBase,
