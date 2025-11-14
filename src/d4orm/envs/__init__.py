@@ -1,4 +1,5 @@
 from .multi2dholo import Multi2dHolo, Multi2dHoloRandom, Multi2dHoloCustom
+from .multi3dholo import Multi3dHolo
 from .unicycle import Unicycle
 
 
@@ -9,6 +10,8 @@ def get_env_cls(env_name: str):
         return Multi2dHoloRandom
     if env_name in ["2dholo_custom", "multi2dholo_custom"]:
         return Multi2dHoloCustom
+    if env_name in ["3dholo", "multi3dholo"]:
+        return Multi3dHolo
     if env_name in ["unicycle"]:
         return Unicycle
     else:

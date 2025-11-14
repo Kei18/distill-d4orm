@@ -22,6 +22,7 @@ class Multi2dHolo(MultiBase):
 
     def __post_init__(self):
         super().__post_init__()
+        self.vel_indices = jnp.arange(self.pos_dim_agent, self.obsv_dim_agent)
 
     def get_start_goal_configuration(self):
         return generate_sphere_configuraiton(
@@ -44,18 +45,10 @@ class Multi2dHolo(MultiBase):
 
         Returns the time derivative of the state.
         """
-        x_pos, y_pos, vx, vy = x
-
         acc_norm = jnp.linalg.norm(u)
         scale_acc = jnp.minimum(1.0, self.ma / acc_norm)
         u = u * scale_acc
-
-        x_dot = vx
-        y_dot = vy
-        vx_dot = u[0]
-        vy_dot = u[1]
-
-        return jnp.array([x_dot, y_dot, vx_dot, vy_dot])
+        return jnp.array([*x[self.vel_indices], *u])
 
     @partial(jax.jit, static_argnums=(0,))
     def clip_actions(self, traj: jax.Array, factor=1):
@@ -66,15 +59,13 @@ class Multi2dHolo(MultiBase):
         return traj.reshape(-1, self.action_dim_agent * self.n_agents)
 
     def clip_velocity(self, x):
-        vx, vy = x[2], x[3]
-        vel_norm = jnp.linalg.norm(jnp.array([vx, vy]))
+        vel_norm = jnp.linalg.norm(x[self.vel_indices])
         scale_vel = jnp.minimum(1.0, self.mv / vel_norm)
-        x = x.at[2].set(vx * scale_vel)
-        x = x.at[3].set(vy * scale_vel)
+        x = x.at[self.vel_indices].set(x[self.vel_indices] * scale_vel)
         return x
 
     def get_current_velocity(self, q):
-        return jnp.linalg.norm(q[:, [2, 3]], axis=-1)
+        return jnp.linalg.norm(q[:, self.vel_indices], axis=-1)
 
     @property
     def action_size(self):
