@@ -8,7 +8,8 @@ from jax import numpy as jnp, config
 
 from .envs.multibase import MultiBase
 
-config.update("jax_default_matmul_precision", "float32")
+def configure_jax(matmul_precision: str = "float32") -> None:
+    config.update("jax_default_matmul_precision", matmul_precision)
 
 
 @dataclass
@@ -25,7 +26,7 @@ class D4ormCfg:
 
     def __post_init__(self):
         # noise scheduling preparation
-        Ndiffuse_ref = 100
+        Ndiffuse_ref = self.Ndiffuse
         betas_ref = jnp.linspace(self.beta1, self.betaT, Ndiffuse_ref)
         betas_ref = jnp.concatenate([jnp.array([0.0]), betas_ref])
         alphas = 1.0 - betas_ref
@@ -45,7 +46,7 @@ def d4orm_opt(
     U_base: jax.Array | None = None,
 ):
     rollout_env_jit = partial(env.rollout)
-    rollout_fn = jax.vmap(rollout_env_jit, in_axes=(0))
+    rollout_fn = jax.vmap(rollout_env_jit, in_axes=0)
     Nagent = env.n_agents
     Nu = env.action_size
 
@@ -84,7 +85,7 @@ def d4orm_opt(
             init=(cfg.Ndiffuse, rng, U_N, U_base),
             length=cfg.Ndiffuse,
         )
-        return U_deform
+        return U_deform, rng
 
     # main
     _, rng = jax.random.split(cfg.rng)
@@ -95,7 +96,8 @@ def d4orm_opt(
     num_denoising = 0
     while (not success or cfg.anytime) and num_denoising < cfg.Niteration:
         num_denoising += 1
-        U_base += denoise(rng, U_base)
+        U_deform, rng = denoise(rng, U_base)
+        U_base += U_deform
         rews, states, goal_masks, collisions = rollout_env_jit(us=U_base)
 
         # mask out actions after reach and stop at the goal

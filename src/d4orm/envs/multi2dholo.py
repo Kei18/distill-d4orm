@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from .multibase import MultiBase
 
-from .utils import generate_sphere_configuraiton
+from .utils import generate_sphere_configuration
 import yaml
 from pathlib import Path
 
@@ -25,7 +25,7 @@ class Multi2dHolo(MultiBase):
         self.vel_indices = jnp.arange(self.pos_dim_agent, self.obsv_dim_agent)
 
     def get_start_goal_configuration(self):
-        return generate_sphere_configuraiton(
+        return generate_sphere_configuration(
             5.0,
             self.n_agents,
             self.obsv_dim_agent,
@@ -46,7 +46,7 @@ class Multi2dHolo(MultiBase):
         Returns the time derivative of the state.
         """
         acc_norm = jnp.linalg.norm(u)
-        scale_acc = jnp.minimum(1.0, self.ma / acc_norm)
+        scale_acc = jnp.minimum(1.0, self.ma / jnp.maximum(acc_norm, 1e-8))
         u = u * scale_acc
         return jnp.array([*x[self.vel_indices], *u])
 
@@ -54,13 +54,13 @@ class Multi2dHolo(MultiBase):
     def clip_actions(self, traj: jax.Array, factor=1):
         traj = traj.reshape(-1, self.n_agents, self.action_dim_agent)
         norm = jnp.linalg.norm(traj, axis=-1, keepdims=True)
-        scale = jnp.minimum(1.0, self.ma * factor / norm)
+        scale = jnp.minimum(1.0, self.ma * factor / jnp.maximum(norm, 1e-8))
         traj = traj * scale
         return traj.reshape(-1, self.action_dim_agent * self.n_agents)
 
     def clip_velocity(self, x):
         vel_norm = jnp.linalg.norm(x[self.vel_indices])
-        scale_vel = jnp.minimum(1.0, self.mv / vel_norm)
+        scale_vel = jnp.minimum(1.0, self.mv / jnp.maximum(vel_norm, 1e-8))
         x = x.at[self.vel_indices].set(x[self.vel_indices] * scale_vel)
         return x
 
@@ -88,6 +88,7 @@ class Multi2dHolo(MultiBase):
 @dataclass(eq=False)
 class Multi2dHoloRandom(Multi2dHolo):
     workspace_size: float = 3.0
+    max_sampling_attempts: int = 10000
 
     def get_start_goal_configuration(self):
         _, rng = jax.random.split(self.rng)
@@ -100,7 +101,7 @@ class Multi2dHoloRandom(Multi2dHolo):
         )
         dim_zero_states = self.obsv_dim_agent - self.pos_dim_agent
 
-        while len(starts) < self.n_agents:
+        for _ in range(self.max_sampling_attempts):
             _, rng = jax.random.split(rng)
             s, g = jax.random.uniform(rng, **params)
             if len(starts) > 0:
@@ -114,6 +115,14 @@ class Multi2dHoloRandom(Multi2dHolo):
                     continue
             starts.append(s.tolist() + [0] * dim_zero_states)
             goals.append(g.tolist() + [0] * dim_zero_states)
+            if len(starts) >= self.n_agents:
+                break
+
+        if len(starts) < self.n_agents:
+            raise ValueError(
+                "Failed to sample non-colliding start/goal pairs. "
+                "Consider reducing n_agents or increasing workspace_size."
+            )
 
         return jnp.array(starts), jnp.array(goals)
 
@@ -121,6 +130,8 @@ class Multi2dHoloRandom(Multi2dHolo):
 @dataclass(eq=False)
 class Multi2dHoloCustom(Multi2dHolo):
     def __post_init__(self):
+        if not self.external_file:
+            raise ValueError("external_file is required for 2dholo_custom.")
         with open(Path(self.external_file)) as f:
             self.external_cfg = yaml.safe_load(f)
         super().__post_init__()
@@ -132,8 +143,14 @@ class Multi2dHoloCustom(Multi2dHolo):
         for o in self.external_cfg["problem"].get("obstacles", []):
             obstacles.append(o["center"])
             obstacles_rad.append(max(o["size"]))
-        self.obs_center = jnp.array(obstacles)
-        self.obs_rad = jnp.array(obstacles_rad)
+        if obstacles:
+            self.obs_center = jnp.array(obstacles)
+            self.obs_rad = jnp.array(obstacles_rad)
+            self.has_obstacles = True
+        else:
+            self.obs_center = jnp.zeros((0, self.pos_dim_agent))
+            self.obs_rad = jnp.zeros((0,))
+            self.has_obstacles = False
 
         # reward
         self.penalty_weight_obs = self.penalty_weight_collision * 2
@@ -153,6 +170,8 @@ class Multi2dHoloCustom(Multi2dHolo):
         distances_to_goals: jax.Array,
     ) -> float:
         rewards, collision = super().get_reward(q, distances_to_goals)
+        if not self.has_obstacles:
+            return rewards, collision
 
         hard_th = self.agent_radius + self.obs_rad
         soft_th = hard_th + self.safe_margin

@@ -1,8 +1,10 @@
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from functools import partial
+
 import jax
 from jax import numpy as jnp
 from flax import struct
-from functools import partial
-from dataclasses import dataclass
 
 
 @struct.dataclass
@@ -27,17 +29,17 @@ class EnvConfig:
 
 
 @dataclass(eq=False)
-class MultiBase(EnvConfig):
+class MultiBase(EnvConfig, ABC):
     obsv_dim_agent: int = 1000
     pos_dim_agent: int = 1000
     agent_radius: float = 1000
-    stop_velocity: float = 1000
 
     def __post_init__(self):
         self.rng = jax.random.PRNGKey(seed=self.seed)
         self.x0, self.xg = self.get_start_goal_configuration()
         self.max_distances = jnp.linalg.norm(self.x0 - self.xg, axis=1)
 
+    @abstractmethod
     def get_start_goal_configuration(self):
         raise NotImplementedError
 
@@ -51,17 +53,21 @@ class MultiBase(EnvConfig):
         )
 
     @partial(jax.jit, static_argnums=(0,))
+    @abstractmethod
     def clip_actions(self, traj, factor=1):
         raise NotImplementedError
 
     @partial(jax.jit, static_argnums=(0,))
+    @abstractmethod
     def agent_dynamics(self, x, u):
         raise NotImplementedError
 
+    @abstractmethod
     def clip_velocity(self, x):
         """x is state for single robot"""
         raise NotImplementedError
 
+    @abstractmethod
     def get_current_velocity(self, q):
         """q is joint state for all robots"""
         raise NotImplementedError
@@ -82,13 +88,13 @@ class MultiBase(EnvConfig):
                 state.collision,
             )
 
-        _, (rews, pipline_states, masks, collisions) = jax.lax.scan(
+        _, (rews, pipeline_states, masks, collisions) = jax.lax.scan(
             step_wrapper, self.state_init, us
         )
 
         rews = rews.mean(axis=0)
 
-        return rews, pipline_states, masks, collisions
+        return rews, pipeline_states, masks, collisions
 
     @partial(jax.jit, static_argnums=(0,))
     def step(
@@ -177,6 +183,8 @@ class MultiBase(EnvConfig):
         return rewards, collision
 
     @property
+    @property
+    @abstractmethod
     def action_size(self):
         raise NotImplementedError
 
@@ -188,6 +196,8 @@ class MultiBase(EnvConfig):
         return [], []
 
     @property
+    @property
+    @abstractmethod
     def env_constraints_dict(self):
         raise NotImplementedError
 

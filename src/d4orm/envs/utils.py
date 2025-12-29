@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 
 
-def generate_sphere_configuraiton(
+def generate_sphere_configuration(
     diameter: float,
     n_agents: int,
     obsv_dim_agent: int,
@@ -36,3 +36,15 @@ def generate_sphere_configuraiton(
     initial_states = jnp.stack(position_components + zero_components, axis=-1)
     goal_states = -initial_states
     return initial_states, goal_states
+
+
+def generate_sphere_configuraiton(
+    diameter: float,
+    n_agents: int,
+    obsv_dim_agent: int,
+    pos_dim_agent: int,
+    rng: jax.Array | None = None,
+) -> tuple[jax.Array, jax.Array]:
+    return generate_sphere_configuration(
+        diameter, n_agents, obsv_dim_agent, pos_dim_agent, rng=rng
+    )

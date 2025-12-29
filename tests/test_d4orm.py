@@ -6,4 +6,7 @@ def test_D4orm():
     env = Multi2dHolo()
     cfg = D4ormCfg()
     U_base, aux = d4orm_opt(cfg=cfg, env=env)
-    print(get_metrics(aux))
+    metrics = get_metrics(aux)
+    assert U_base.shape == (cfg.Hsample, env.action_size)
+    assert "reward_final" in metrics
+    assert metrics["avg_steps_to_goal"] <= metrics["max_steps_to_goal"]

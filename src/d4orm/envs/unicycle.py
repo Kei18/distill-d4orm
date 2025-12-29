@@ -4,7 +4,7 @@ from functools import partial
 from dataclasses import dataclass
 
 from .multibase import MultiBase
-from .utils import generate_sphere_configuraiton
+from .utils import generate_sphere_configuration
 
 
 @dataclass(eq=False)
@@ -22,7 +22,7 @@ class Unicycle(MultiBase):
         super().__post_init__()
 
     def get_start_goal_configuration(self):
-        x0, xg = generate_sphere_configuraiton(
+        x0, xg = generate_sphere_configuration(
             5.0,
             self.n_agents,
             self.obsv_dim_agent,

@@ -62,7 +62,7 @@ def save_anim(env: MultiBase, xs: jnp.ndarray, output_path: Path, offset: int = 
     anim = FuncAnimation(
         fig,
         update,
-        frames=xs.shape[0] // offset + 1,
+        frames=xs.shape[0] // offset,
         blit=True,
         interval=100,
     )
@@ -98,20 +98,20 @@ def save_img(
         ax.add_artist(start_circle)
 
     # --- Collision Detection ---
-    collision_positions = []
-    for t in range(xs.shape[0]):
-        positions = xs[t, :, : env.pos_dim_agent]
-        diffs = positions[:, None, :] - positions[None, :, :]
-        dists = jnp.linalg.norm(diffs, axis=-1)
-        collision_matrix = (dists < env.agent_radius * 2 + env.safe_margin) & (
-            dists > 0
+    positions = xs[:, :, : env.pos_dim_agent]
+    diffs = positions[:, :, None, :] - positions[:, None, :, :]
+    dists = jnp.linalg.norm(diffs, axis=-1)
+    collision_matrix = (dists < env.agent_radius * 2 + env.safe_margin) & (dists > 0)
+    collision_mask = jnp.any(collision_matrix, axis=-1)
+    collision_positions = positions[collision_mask]
+    if collision_positions.size > 0:
+        ax.plot(
+            collision_positions[:, 0],
+            collision_positions[:, 1],
+            "rx",
+            markersize=10,
+            markeredgewidth=1,
         )
-        for i in range(env.n_agents):
-            if jnp.any(collision_matrix[i]):
-                collision_positions.append(positions[i])
-
-    for pos in collision_positions:
-        ax.plot(pos[0], pos[1], "rx", markersize=10, markeredgewidth=1)
 
     # --- Plot Goal Positions ---
     xg_reshaped = env.xg.reshape(env.n_agents, -1)
