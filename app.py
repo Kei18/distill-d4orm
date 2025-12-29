@@ -3,6 +3,7 @@ from datetime import datetime
 import time
 from pathlib import Path
 from dataclasses import dataclass, asdict
+from typing import Literal
 import yaml
 from dacite import from_dict, Config
 import tyro
@@ -16,19 +17,27 @@ from d4orm import (
     save_img,
     d4orm_opt,
     get_metrics,
+    configure_jax,
 )
 
 
 @dataclass
 class Args(EnvConfig, D4ormCfg):
     # env
-    env_name: str = "2dholo"  # available: 2dholo, 2dholo_random, 2dholo_custom
+    env_name: Literal[
+        "2dholo",
+        "2dholo_random",
+        "2dholo_custom",
+        "3dholo",
+        "unicycle",
+    ] = "2dholo"
     # result
     save_img: bool = True
     save_gif: bool = False
 
 
 def main(args: Args):
+    configure_jax()
     # setup env
     env_cls = get_env_cls(args.env_name)
     env = from_dict(env_cls, asdict(args), config=Config(strict=False))

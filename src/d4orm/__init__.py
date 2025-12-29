@@ -1,7 +1,7 @@
 import sys
 from loguru import logger
 
-from .d4orm import D4ormCfg, d4orm_opt, get_metrics
+from .d4orm import D4ormCfg, d4orm_opt, get_metrics, configure_jax
 from .envs import get_env_cls
 from .envs.multibase import EnvConfig
 from .viz import save_anim, save_img
@@ -31,4 +31,5 @@ __all__ = [
     "save_anim",
     "save_img",
     "get_metrics",
+    "configure_jax",
 ]
