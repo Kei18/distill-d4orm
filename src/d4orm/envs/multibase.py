@@ -183,7 +183,6 @@ class MultiBase(EnvConfig, ABC):
         return rewards, collision
 
     @property
-    @property
     @abstractmethod
     def action_size(self):
         raise NotImplementedError
@@ -195,7 +194,6 @@ class MultiBase(EnvConfig, ABC):
     def get_heading_line(self, state, position, agent_idx):
         return [], []
 
-    @property
     @property
     @abstractmethod
     def env_constraints_dict(self):
