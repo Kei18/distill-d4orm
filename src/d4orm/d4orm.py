@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from functools import partial
+import time
 
 from loguru import logger
 
@@ -23,6 +24,7 @@ class D4ormCfg:
     beta1: float = 1e-4  # initial beta
     betaT: float = 2e-2  # final beta
     anytime: bool = False
+    max_runtime_sec: float | None = None  # optional wall-clock runtime budget
 
     def __post_init__(self):
         # noise scheduling preparation
@@ -94,7 +96,14 @@ def d4orm_opt(
 
     success = False
     num_denoising = 0
-    while (not success or cfg.anytime) and num_denoising < cfg.Niteration:
+    start_time = time.time()
+
+    def under_runtime_budget():
+        if cfg.max_runtime_sec is None:
+            return True
+        return (time.time() - start_time) < cfg.max_runtime_sec
+
+    while (not success or cfg.anytime) and num_denoising < cfg.Niteration and under_runtime_budget():
         num_denoising += 1
         U_deform, rng = denoise(rng, U_base)
         U_base += U_deform
@@ -120,8 +129,20 @@ def d4orm_opt(
         )
 
     U_base = env.clip_actions(U_base)
+    runtime_exceeded = (cfg.max_runtime_sec is not None) and (
+        (time.time() - start_time) >= cfg.max_runtime_sec
+    )
+    if runtime_exceeded:
+        stop_reason = "runtime"
+    elif num_denoising >= cfg.Niteration:
+        stop_reason = "iteration"
+    else:
+        stop_reason = "success"
+
     return U_base, dict(
         num_denoising=num_denoising,
+        stop_reason=stop_reason,
+        elapsed_time_sec=time.time() - start_time,
         rollout=rollout_env_jit(us=U_base),
     )
 
