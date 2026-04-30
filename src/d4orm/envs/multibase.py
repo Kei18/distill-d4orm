@@ -37,7 +37,10 @@ class MultiBase(EnvConfig, ABC):
     def __post_init__(self):
         self.rng = jax.random.PRNGKey(seed=self.seed)
         self.x0, self.xg = self.get_start_goal_configuration()
-        self.max_distances = jnp.linalg.norm(self.x0 - self.xg, axis=1)
+        self.max_distances = jnp.linalg.norm(
+            self.x0[:, : self.pos_dim_agent] - self.xg[:, : self.pos_dim_agent],
+            axis=1,
+        )
 
     @abstractmethod
     def get_start_goal_configuration(self):
@@ -126,7 +129,7 @@ class MultiBase(EnvConfig, ABC):
             )
         )(q_new, self.xg)
 
-        curr_vel = self.get_current_velocity(q)
+        curr_vel = jnp.abs(self.get_current_velocity(q))
         stop_update_mask = (dist_to_goals < self.stop_distance) & (
             curr_vel <= self.stop_velocity
         )
