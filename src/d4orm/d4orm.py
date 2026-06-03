@@ -120,7 +120,7 @@ def d4orm_opt(
             U_base = U_base * (1 - goal_masks_action)
 
         # compute metrics
-        num_collisions = int(jnp.sum(collisions).item() / 2)
+        num_collisions = int(jnp.sum(collisions).item())
         goal_reach_rate = jnp.count_nonzero(goal_masks[-1]).item() / Nagent
         reward = rews.mean().item()
         success = int(goal_reach_rate == 1.0 and num_collisions == 0)
